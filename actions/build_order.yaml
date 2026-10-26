@@ -1,0 +1,127 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: build_order
+title: Prepare an order with products
+summary: >-
+  Prepare a sales order, return sales order, invoice or return invoice with the products the rep
+  names — the phone fills the app's cart and opens it for the rep to review and submit.
+since: 0.1.0
+reports_result: true
+description: |-
+  Prepares an order, invoice or return WITH products: the phone adds the lines through the
+  app's own cart and opens it for the rep to review and submit (it does not submit anything).
+  Use it whenever the rep asks for an order, invoice or return with products — not
+  open_activity — and never ask the rep to add the items by hand.
+  - Products: each as the rep said it, plus product_variants (other-script spellings and
+    transliterations). When a product matches several items, the rep picks one on the card.
+  - qty: a positive number in the unit the rep said. unit only when the rep names one, in
+    English ("carton", "box", "piece"). variant only for a named size or flavour ("330ml",
+    "Diet").
+  - Client: as for open_activity — the visited client during an open visit, otherwise
+    client_name (with variants), client_id or nearest.
+  The result lists the lines added and the lines that failed (each with a code); summarize it
+  briefly.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [kind, items]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: The document to prepare.
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    nearest: { $shared: nearest }
+    items:
+      type: array
+      minItems: 1
+      maxItems: 30
+      items:
+        type: object
+        additionalProperties: false
+        required: [product, qty]
+        properties:
+          product: { $shared: product }
+          product_variants: { $shared: product_variants }
+          qty:
+            type: number
+            exclusiveMinimum: 0
+            description: How many, in the unit the rep said.
+          unit:
+            type: string
+            minLength: 1
+            description: Only when the rep names a unit, in English — "carton", "box", "piece".
+          variant:
+            type: string
+            minLength: 1
+            description: Only for a named size or flavour — "330ml", "Diet".
+    comment:
+      type: string
+      minLength: 1
+      description: A comment for the document, when the rep gives one.
+
+result:
+  type: object
+  required: [kind, added, failed]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+    client_id: { type: string, description: The client the document is for. }
+    client_name: { type: string }
+    added:
+      type: array
+      description: The lines added to the cart, as the app's products.
+      items:
+        type: object
+        required: [product, qty]
+        properties:
+          product: { type: string, description: The product's name as saved. }
+          qty: { type: number }
+          unit: { type: string }
+    failed:
+      type: array
+      description: The lines that could not be added, each with the reason's code.
+      items:
+        type: object
+        required: [product, code]
+        properties:
+          product: { type: string, description: The product as it was requested. }
+          qty: { type: number }
+          code: { type: string }
+          error: { type: string, description: "Why, in plain words." }
+
+examples:
+  - says: اعمل طلبية مبيعات فيها ٢ سن كويك برتقال و ٣ بيبسي
+    request:
+      action: build_order
+      params:
+        kind: sales_order
+        items:
+          - product: سن كويك برتقال
+            product_variants: [Sun Quick Orange, Sunquick Orange]
+            qty: 2
+          - product: بيبسي
+            product_variants: [Pepsi]
+            qty: 3
+      summary: تجهيز طلبية المبيعات للمراجعة
+    result:
+      ref: "65f1a2b3c4d5e6f708192a3d:0"
+      action: build_order
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        added:
+          - { product: Sunquick Orange 200 ml, qty: 2, unit: Piece }
+          - { product: Pepsi 330 ml, qty: 3, unit: Piece }
+        failed: []
+
+maintainer_notes:
+  - List the codes a failed line can carry (no product matched, a unit the product doesn't have…).
+  - >-
+    What happens when no visit is open and no client is given — does the app ask the rep to pick
+    one, or fail the action?

@@ -1,0 +1,52 @@
+{
+  "name": "repzo-ai-mobile-actions",
+  "version": "0.1.0",
+  "description": "The contract between the Repzo AI chat and the Repzo mobile app: the device actions the assistant may ask the phone to run, their parameters, results and errors.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./catalog.json": "./catalog.json",
+    "./schemas/*": "./schemas/*",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "catalog.json",
+    "actions",
+    "schemas",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "generate": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs --check",
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run check && npm run typecheck && npm run build && node --test \"test/*.test.mjs\"",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "repzo",
+    "ai",
+    "mobile",
+    "actions",
+    "contract"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "json-schema-to-typescript": "^15.0.4",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.1"
+  }
+}

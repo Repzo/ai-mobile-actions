@@ -1,0 +1,46 @@
+# Fragments the action files use as `{ $shared: <name> }` inside `params` and `result`.
+# The build inlines them, so every action in catalog.json stands on its own.
+
+client_name:
+  type: string
+  minLength: 1
+  description: >-
+    The client's name as the rep said it. The phone looks it up in the rep's own client list,
+    so never look the client up first.
+
+client_name_variants:
+  type: array
+  maxItems: 6
+  items: { type: string, minLength: 1 }
+  description: >-
+    Other spellings of client_name. Client names are usually saved in Latin letters even when
+    the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when
+    the rep wrote Latin letters — e.g. "سوبر كريم" → ["Super Kareem", "Super Karim"]. Send it
+    whenever you send client_name.
+
+client_id:
+  type: string
+  minLength: 1
+  description: >-
+    The client's id — only when you already have it, for example from an earlier action's
+    result. Otherwise send client_name.
+
+nearest:
+  type: boolean
+  const: true
+  description: >-
+    Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it
+    for "the nearest client", "the closest one", "near me".
+
+product:
+  type: string
+  minLength: 1
+  description: The product as the rep said it.
+
+product_variants:
+  type: array
+  maxItems: 6
+  items: { type: string, minLength: 1 }
+  description: >-
+    Other spellings of product — products are often saved in English or under a local Arabic
+    name: send other-script spellings and transliterations, e.g. "بيبسي" → ["Pepsi"].

@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: open_activity
+title: Open a client activity
+summary: >-
+  Open one of the app's activities for a client — forms, retail execution, store check, audit,
+  notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete.
+since: 0.1.0
+reports_result: false
+description: |-
+  Opens an activity for a client so the rep completes it in the app; the phone handles the
+  visit, permissions and picking. Prefer it over open_screen for anything done for a client,
+  and never tell the rep to go there themselves.
+  - Client: during an open visit, leave the client out — the visited client is used. Otherwise
+    send client_name (with client_name_variants), or nearest: true, as for start_visit.
+  - A specific form or retail-execution template: put its name in form_name or template_name.
+  - An order, invoice or return WITH products is build_order, not this.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [activity]
+  properties:
+    activity:
+      type: string
+      enum:
+        - form
+        - form_v1
+        - form_history
+        - retail_execution
+        - store_check
+        - audit
+        - item_selection
+        - shelf_scan
+        - note
+        - photo
+        - before_after
+        - sales_order
+        - return_sales_order
+        - invoice
+        - cash_invoice
+        - credit_invoice
+        - collection
+        - reminders
+        - clm
+        - client_history
+        - media
+        - ai_sales_order
+      description: >-
+        form: the client's forms (form_v1 only for classic forms; form_history: forms already
+        filled). retail_execution, store_check, audit, item_selection, shelf_scan: the matching
+        merchandising activity. note, photo, before_after: a note or photos. sales_order,
+        return_sales_order, invoice, cash_invoice, credit_invoice: an empty document (use
+        build_order when the rep names products). collection: the client's balance and payments.
+        reminders, clm (presentations), client_history, media: the matching client screen.
+        ai_sales_order: the suggested sales order.
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    nearest: { $shared: nearest }
+    form_name:
+      type: string
+      minLength: 1
+      description: The name of a specific form to open.
+    template_name:
+      type: string
+      minLength: 1
+      description: The name of a specific retail-execution template to open.
+
+examples:
+  - says: I want to fill a form
+    request:
+      action: open_activity
+      params: { activity: form }
+      summary: Open the forms for the current visit
+  - says: سجل التحصيل عند النور ماركت
+    request:
+      action: open_activity
+      params:
+        activity: collection
+        client_name: النور ماركت
+        client_name_variants: [Al Noor Market, Al Nour Market]
+      summary: فتح التحصيل لعميل النور ماركت
+  - says: Open the shelf audit form
+    request:
+      action: open_activity
+      params: { activity: form, form_name: Shelf audit }
+      summary: Open the "Shelf audit" form
+
+maintainer_notes:
+  - >-
+    The app does not report a successful open. Does it report a failure (no visit and no client,
+    an activity the rep may not use, no form matching form_name)? If so, list the codes.
+  - Confirm which activities need an open visit and which open without one.

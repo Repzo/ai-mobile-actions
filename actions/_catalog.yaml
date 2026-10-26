@@ -1,0 +1,33 @@
+# Rules that apply to every action, and the wire format the app speaks today.
+
+guidance:
+  - >-
+    The phone runs these actions itself, with the app's own checks (GPS geofence, client
+    verification, offline data). For anything an action covers, use the action — not the Repzo
+    API directly, and never tell the rep to go somewhere in the app themselves.
+  - >-
+    One action per reply. The app shows the request's summary on an action card and runs the
+    action only when the rep confirms it.
+  - >-
+    Pick the action by what the rep wants: an order, invoice or return with products →
+    build_order; one of the app's own activities for a client (a form, a note, a photo,
+    collection…) → open_activity; information to record or report (prices, quantities,
+    feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.
+  - >-
+    When a result comes back failed, explain the error briefly and suggest a fix; never retry the
+    same action on your own. Cancelled means the rep declined the action: don't run it again
+    unless they ask.
+  - "Replies are read on a phone: keep them short."
+
+transport:
+  text:
+    request_block: repzo-action
+    result_prefix: "[action-result]"
+    instructions: |-
+      To run an action, end your reply with exactly one fenced block whose info string is
+      repzo-action and whose body is the action request as JSON:
+      ```repzo-action
+      {"action":"<name>","params":{...},"summary":"<one short line the rep will confirm>"}
+      ```
+      The app answers with a message that starts with [action-result], followed by the action
+      result as JSON.

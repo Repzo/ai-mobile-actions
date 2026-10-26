@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: open_screen
+title: Open an app screen
+summary: >-
+  Open a screen of the mobile app — clients, calendar, tasks, reports, approvals, a client's
+  profile, and more.
+since: 0.1.0
+reports_result: false
+description: |-
+  Opens a screen of the Repzo mobile app; a floating "back to assistant" button brings the rep
+  back to the chat. For anything done for a specific client (a form, an order, a note, a photo,
+  collection…) use open_activity instead. client_profile needs the client: send client_name and
+  client_name_variants.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [screen]
+  properties:
+    screen:
+      type: string
+      enum:
+        - client_profile
+        - clients
+        - visit
+        - sales
+        - forms
+        - tasks
+        - calendar
+        - reports
+        - dashboards
+        - timeline
+        - approvals
+        - settings
+        - profile
+      description: >-
+        client_profile: one client's profile (needs client_name). clients: the rep's client
+        list. visit: the current visit. sales: sales documents. forms: forms. tasks: tasks.
+        calendar: the rep's schedule. reports, dashboards: the rep's reports and dashboards.
+        timeline: the rep's activity timeline. approvals: approval requests. settings: app
+        settings. profile: the rep's own profile.
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+  if:
+    properties: { screen: { const: client_profile } }
+  then:
+    required: [client_name]
+
+examples:
+  - says: افتح التقويم
+    request:
+      action: open_screen
+      params: { screen: calendar }
+      summary: فتح التقويم
+  - says: Open Al Noor Market's profile
+    request:
+      action: open_screen
+      params:
+        screen: client_profile
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+      summary: Open Al Noor Market's profile
+
+maintainer_notes:
+  - >-
+    The app does not report a successful open (the rep is taken to the screen). Does it report a
+    failure (no matching client for client_profile, a screen the rep may not open)? If so, list
+    the codes in errors.

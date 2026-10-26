@@ -1,0 +1,725 @@
+{
+  "name": "repzo-ai-mobile-actions",
+  "version": "0.1.0",
+  "guidance": [
+    "The phone runs these actions itself, with the app's own checks (GPS geofence, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly, and never tell the rep to go somewhere in the app themselves.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it.",
+    "Pick the action by what the rep wants: an order, invoice or return with products → build_order; one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.",
+    "When a result comes back failed, explain the error briefly and suggest a fix; never retry the same action on your own. Cancelled means the rep declined the action: don't run it again unless they ask.",
+    "Replies are read on a phone: keep them short."
+  ],
+  "transport": {
+    "text": {
+      "request_block": "repzo-action",
+      "result_prefix": "[action-result]",
+      "instructions": "To run an action, end your reply with exactly one fenced block whose info string is\nrepzo-action and whose body is the action request as JSON:\n```repzo-action\n{\"action\":\"<name>\",\"params\":{...},\"summary\":\"<one short line the rep will confirm>\"}\n```\nThe app answers with a message that starts with [action-result], followed by the action\nresult as JSON."
+    }
+  },
+  "actions": [
+    {
+      "name": "build_order",
+      "title": "Prepare an order with products",
+      "summary": "Prepare a sales order, return sales order, invoice or return invoice with the products the rep names — the phone fills the app's cart and opens it for the rep to review and submit.",
+      "description": "Prepares an order, invoice or return WITH products: the phone adds the lines through the\napp's own cart and opens it for the rep to review and submit (it does not submit anything).\nUse it whenever the rep asks for an order, invoice or return with products — not\nopen_activity — and never ask the rep to add the items by hand.\n- Products: each as the rep said it, plus product_variants (other-script spellings and\n  transliterations). When a product matches several items, the rep picks one on the card.\n- qty: a positive number in the unit the rep said. unit only when the rep names one, in\n  English (\"carton\", \"box\", \"piece\"). variant only for a named size or flavour (\"330ml\",\n  \"Diet\").\n- Client: as for open_activity — the visited client during an open visit, otherwise\n  client_name (with variants), client_id or nearest.\nThe result lists the lines added and the lines that failed (each with a code); summarize it\nbriefly.",
+      "since": "0.1.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "items"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "The document to prepare."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The product as the rep said it."
+                },
+                "product_variants": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Other spellings of product — products are often saved in English or under a local Arabic name: send other-script spellings and transliterations, e.g. \"بيبسي\" → [\"Pepsi\"]."
+                },
+                "qty": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "How many, in the unit the rep said."
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only when the rep names a unit, in English — \"carton\", \"box\", \"piece\"."
+                },
+                "variant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only for a named size or flavour — \"330ml\", \"Diet\"."
+                }
+              }
+            }
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comment for the document, when the rep gives one."
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "added",
+          "failed"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ]
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client the document is for."
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "added": {
+            "type": "array",
+            "description": "The lines added to the cart, as the app's products.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "failed": {
+            "type": "array",
+            "description": "The lines that could not be added, each with the reason's code.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "code"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product as it was requested."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string",
+                  "description": "Why, in plain words."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [],
+      "examples": [
+        {
+          "says": "اعمل طلبية مبيعات فيها ٢ سن كويك برتقال و ٣ بيبسي",
+          "request": {
+            "action": "build_order",
+            "params": {
+              "kind": "sales_order",
+              "items": [
+                {
+                  "product": "سن كويك برتقال",
+                  "product_variants": [
+                    "Sun Quick Orange",
+                    "Sunquick Orange"
+                  ],
+                  "qty": 2
+                },
+                {
+                  "product": "بيبسي",
+                  "product_variants": [
+                    "Pepsi"
+                  ],
+                  "qty": 3
+                }
+              ]
+            },
+            "summary": "تجهيز طلبية المبيعات للمراجعة"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a3d:0",
+            "action": "build_order",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "added": [
+                {
+                  "product": "Sunquick Orange 200 ml",
+                  "qty": 2,
+                  "unit": "Piece"
+                },
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 3,
+                  "unit": "Piece"
+                }
+              ],
+              "failed": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_activity",
+      "title": "Open a client activity",
+      "summary": "Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete.",
+      "description": "Opens an activity for a client so the rep completes it in the app; the phone handles the\nvisit, permissions and picking. Prefer it over open_screen for anything done for a client,\nand never tell the rep to go there themselves.\n- Client: during an open visit, leave the client out — the visited client is used. Otherwise\n  send client_name (with client_name_variants), or nearest: true, as for start_visit.\n- A specific form or retail-execution template: put its name in form_name or template_name.\n- An order, invoice or return WITH products is build_order, not this.",
+      "since": "0.1.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "activity"
+        ],
+        "properties": {
+          "activity": {
+            "type": "string",
+            "enum": [
+              "form",
+              "form_v1",
+              "form_history",
+              "retail_execution",
+              "store_check",
+              "audit",
+              "item_selection",
+              "shelf_scan",
+              "note",
+              "photo",
+              "before_after",
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "cash_invoice",
+              "credit_invoice",
+              "collection",
+              "reminders",
+              "clm",
+              "client_history",
+              "media",
+              "ai_sales_order"
+            ],
+            "description": "form: the client's forms (form_v1 only for classic forms; form_history: forms already filled). retail_execution, store_check, audit, item_selection, shelf_scan: the matching merchandising activity. note, photo, before_after: a note or photos. sales_order, return_sales_order, invoice, cash_invoice, credit_invoice: an empty document (use build_order when the rep names products). collection: the client's balance and payments. reminders, clm (presentations), client_history, media: the matching client screen. ai_sales_order: the suggested sales order."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          },
+          "form_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of a specific form to open."
+          },
+          "template_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of a specific retail-execution template to open."
+          }
+        }
+      },
+      "errors": [],
+      "examples": [
+        {
+          "says": "I want to fill a form",
+          "request": {
+            "action": "open_activity",
+            "params": {
+              "activity": "form"
+            },
+            "summary": "Open the forms for the current visit"
+          }
+        },
+        {
+          "says": "سجل التحصيل عند النور ماركت",
+          "request": {
+            "action": "open_activity",
+            "params": {
+              "activity": "collection",
+              "client_name": "النور ماركت",
+              "client_name_variants": [
+                "Al Noor Market",
+                "Al Nour Market"
+              ]
+            },
+            "summary": "فتح التحصيل لعميل النور ماركت"
+          }
+        },
+        {
+          "says": "Open the shelf audit form",
+          "request": {
+            "action": "open_activity",
+            "params": {
+              "activity": "form",
+              "form_name": "Shelf audit"
+            },
+            "summary": "Open the \"Shelf audit\" form"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_screen",
+      "title": "Open an app screen",
+      "summary": "Open a screen of the mobile app — clients, calendar, tasks, reports, approvals, a client's profile, and more.",
+      "description": "Opens a screen of the Repzo mobile app; a floating \"back to assistant\" button brings the rep\nback to the chat. For anything done for a specific client (a form, an order, a note, a photo,\ncollection…) use open_activity instead. client_profile needs the client: send client_name and\nclient_name_variants.",
+      "since": "0.1.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "screen"
+        ],
+        "properties": {
+          "screen": {
+            "type": "string",
+            "enum": [
+              "client_profile",
+              "clients",
+              "visit",
+              "sales",
+              "forms",
+              "tasks",
+              "calendar",
+              "reports",
+              "dashboards",
+              "timeline",
+              "approvals",
+              "settings",
+              "profile"
+            ],
+            "description": "client_profile: one client's profile (needs client_name). clients: the rep's client list. visit: the current visit. sales: sales documents. forms: forms. tasks: tasks. calendar: the rep's schedule. reports, dashboards: the rep's reports and dashboards. timeline: the rep's activity timeline. approvals: approval requests. settings: app settings. profile: the rep's own profile."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          }
+        },
+        "if": {
+          "properties": {
+            "screen": {
+              "const": "client_profile"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "client_name"
+          ]
+        }
+      },
+      "errors": [],
+      "examples": [
+        {
+          "says": "افتح التقويم",
+          "request": {
+            "action": "open_screen",
+            "params": {
+              "screen": "calendar"
+            },
+            "summary": "فتح التقويم"
+          }
+        },
+        {
+          "says": "Open Al Noor Market's profile",
+          "request": {
+            "action": "open_screen",
+            "params": {
+              "screen": "client_profile",
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ]
+            },
+            "summary": "Open Al Noor Market's profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "request_input",
+      "title": "Ask the rep to fill a short form",
+      "summary": "Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep tells you something to record or report.",
+      "description": "Shows the rep a short form and returns their answers. Use it when the rep tells you\ninformation to record or report — prices, quantities, feedback. Prefill each field's default\nwith anything you already know, and ask only for what you can't infer. For the app's own\nactivities (a note, a form…) use open_activity instead.",
+      "since": "0.1.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "fields"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form's title, in the rep's language."
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "label",
+                "type"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                  "description": "The answer's key in the result."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field's label, in the rep's language."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number",
+                    "date",
+                    "select",
+                    "boolean"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The choices of a select field."
+                },
+                "default": {
+                  "description": "A prefilled answer — text, a number, an ISO date (YYYY-MM-DD) or true/false.",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              },
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "select"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "options"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "description": "The rep's answers, keyed by each field's key."
+      },
+      "errors": [],
+      "examples": [
+        {
+          "says": "The competitor sells Pepsi 330 ml at 0.35 here",
+          "request": {
+            "action": "request_input",
+            "params": {
+              "title": "Competitor price",
+              "fields": [
+                {
+                  "key": "product",
+                  "label": "Product",
+                  "type": "text",
+                  "required": true,
+                  "default": "Pepsi 330 ml"
+                },
+                {
+                  "key": "price",
+                  "label": "Price",
+                  "type": "number",
+                  "required": true,
+                  "default": 0.35
+                },
+                {
+                  "key": "competitor",
+                  "label": "Competitor",
+                  "type": "text",
+                  "required": true
+                }
+              ]
+            },
+            "summary": "Record a competitor price"
+          }
+        }
+      ]
+    },
+    {
+      "name": "start_visit",
+      "title": "Start a visit",
+      "summary": "Start a visit at one of the rep's clients — by name, by id, or the nearest client by live GPS.",
+      "description": "Starts a visit at a client from the rep's own client list. The phone finds the client itself,\nso never look the client up first.\n- By name: send client_name as the rep said it, plus client_name_variants.\n- Nearest, closest, \"near me\": send nearest: true. The phone ranks the rep's own clients by\n  live GPS distance and the rep picks one on the action card. Never ask the rep to search the\n  list themselves.\n- client_id only when you already have it from an earlier result.\nThe phone applies its own checks (GPS geofence, client verification) and may ask the rep to\nconfirm a visit outside the client's area. The result names the visited client, or says why\nthe visit could not start.",
+      "since": "0.1.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "client_name"
+            ]
+          },
+          {
+            "required": [
+              "client_id"
+            ]
+          },
+          {
+            "required": [
+              "nearest"
+            ]
+          }
+        ]
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The visited client's id."
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The visited client's name as saved."
+          },
+          "client_code": {
+            "type": "string",
+            "description": "The visited client's code."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the visit started (ISO 8601)."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "out_of_geofence",
+          "description": "The rep is outside the client's geofence, so the visit needs an approval first. Tell the rep; approval_flow names the request the app uses for it.",
+          "data": {
+            "approval_flow": {
+              "type": "string",
+              "description": "The approval request to raise, e.g. request_location_edit."
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "says": "Start a visit at Al Noor Market",
+          "request": {
+            "action": "start_visit",
+            "params": {
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ]
+            },
+            "summary": "Start a visit at Al Noor Market"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a3b:0",
+            "action": "start_visit",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "client_code": "C-1024",
+              "started_at": "2026-01-15T08:30:00.000Z"
+            }
+          }
+        },
+        {
+          "says": "أريد بدء زيارة عند أقرب عميل",
+          "request": {
+            "action": "start_visit",
+            "params": {
+              "nearest": true
+            },
+            "summary": "بدء زيارة لأقرب عميل حسب موقعك"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a3c:0",
+            "action": "start_visit",
+            "status": "failed",
+            "error": "The rep is outside the client's geofence; an approval request is needed.",
+            "data": {
+              "code": "out_of_geofence",
+              "approval_flow": "request_location_edit"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

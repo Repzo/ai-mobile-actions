@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: request_input
+title: Ask the rep to fill a short form
+summary: >-
+  Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep
+  tells you something to record or report.
+since: 0.1.0
+reports_result: true
+description: |-
+  Shows the rep a short form and returns their answers. Use it when the rep tells you
+  information to record or report — prices, quantities, feedback. Prefill each field's default
+  with anything you already know, and ask only for what you can't infer. For the app's own
+  activities (a note, a form…) use open_activity instead.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [title, fields]
+  properties:
+    title:
+      type: string
+      minLength: 1
+      description: The form's title, in the rep's language.
+    fields:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        additionalProperties: false
+        required: [key, label, type]
+        properties:
+          key:
+            type: string
+            pattern: "^[A-Za-z][A-Za-z0-9_]*$"
+            description: The answer's key in the result.
+          label:
+            type: string
+            minLength: 1
+            description: The field's label, in the rep's language.
+          type:
+            type: string
+            enum: [text, number, date, select, boolean]
+          required: { type: boolean }
+          options:
+            type: array
+            minItems: 1
+            items: { type: string, minLength: 1 }
+            description: The choices of a select field.
+          default:
+            description: A prefilled answer — text, a number, an ISO date (YYYY-MM-DD) or true/false.
+            type: [string, number, boolean]
+        if:
+          properties: { type: { const: select } }
+        then:
+          required: [options]
+
+result:
+  type: object
+  description: The rep's answers, keyed by each field's key.
+
+examples:
+  - says: The competitor sells Pepsi 330 ml at 0.35 here
+    request:
+      action: request_input
+      params:
+        title: Competitor price
+        fields:
+          - { key: product, label: Product, type: text, required: true, default: Pepsi 330 ml }
+          - { key: price, label: Price, type: number, required: true, default: 0.35 }
+          - { key: competitor, label: Competitor, type: text, required: true }
+      summary: Record a competitor price
+
+maintainer_notes:
+  - >-
+    The result's shape is not confirmed: are the answers `data` itself (as this file says) or
+    nested, e.g. `data.values`? Fix `result` and add an example result.
+  - Confirm the date format the app expects for a date field's default (ISO YYYY-MM-DD assumed).

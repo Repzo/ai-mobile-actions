@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "action-request.schema.json",
+  "title": "Action request",
+  "description": "What the assistant asks the phone to run. The app shows `summary` on an action card and runs the action once the rep confirms it. `params` must match the action's own `params` schema in the catalog.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action", "params", "summary"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "The action's name, from the catalog."
+    },
+    "params": {
+      "type": "object",
+      "description": "The action's parameters."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "One short line, in the rep's language, that the rep confirms on the action card."
+    }
+  }
+}

@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: start_visit
+title: Start a visit
+summary: >-
+  Start a visit at one of the rep's clients — by name, by id, or the nearest client by live GPS.
+since: 0.1.0
+reports_result: true
+description: |-
+  Starts a visit at a client from the rep's own client list. The phone finds the client itself,
+  so never look the client up first.
+  - By name: send client_name as the rep said it, plus client_name_variants.
+  - Nearest, closest, "near me": send nearest: true. The phone ranks the rep's own clients by
+    live GPS distance and the rep picks one on the action card. Never ask the rep to search the
+    list themselves.
+  - client_id only when you already have it from an earlier result.
+  The phone applies its own checks (GPS geofence, client verification) and may ask the rep to
+  confirm a visit outside the client's area. The result names the visited client, or says why
+  the visit could not start.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    nearest: { $shared: nearest }
+  anyOf:
+    - required: [client_name]
+    - required: [client_id]
+    - required: [nearest]
+
+result:
+  type: object
+  required: [client_id, client_name]
+  properties:
+    client_id: { type: string, description: The visited client's id. }
+    client_name: { type: string, description: The visited client's name as saved. }
+    client_code: { type: string, description: The visited client's code. }
+    started_at:
+      type: string
+      format: date-time
+      description: When the visit started (ISO 8601).
+
+errors:
+  - code: out_of_geofence
+    description: >-
+      The rep is outside the client's geofence, so the visit needs an approval first. Tell the
+      rep; approval_flow names the request the app uses for it.
+    data:
+      approval_flow:
+        type: string
+        description: The approval request to raise, e.g. request_location_edit.
+
+examples:
+  - says: Start a visit at Al Noor Market
+    request:
+      action: start_visit
+      params:
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+      summary: Start a visit at Al Noor Market
+    result:
+      ref: "65f1a2b3c4d5e6f708192a3b:0"
+      action: start_visit
+      status: success
+      data:
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        client_code: C-1024
+        started_at: "2026-01-15T08:30:00.000Z"
+  - says: أريد بدء زيارة عند أقرب عميل
+    request:
+      action: start_visit
+      params: { nearest: true }
+      summary: بدء زيارة لأقرب عميل حسب موقعك
+    result:
+      ref: "65f1a2b3c4d5e6f708192a3c:0"
+      action: start_visit
+      status: failed
+      error: The rep is outside the client's geofence; an approval request is needed.
+      data:
+        code: out_of_geofence
+        approval_flow: request_location_edit
+
+maintainer_notes:
+  - >-
+    Failure codes other than out_of_geofence are not listed yet (for example: no client matched,
+    a visit already open, an unverified client) — add each one the app reports.
+  - >-
+    When several clients match client_name, does the app let the rep pick, or fail? Describe it
+    here once settled.
