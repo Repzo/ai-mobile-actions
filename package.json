@@ -2,7 +2,6 @@
   "name": "repzo-ai-mobile-actions",
   "version": "0.1.0",
   "description": "The contract between the Repzo AI chat and the Repzo mobile app: the device actions the assistant may ask the phone to run, their parameters, results and errors.",
-  "private": true,
   "license": "UNLICENSED",
   "author": "Repzo",
   "repository": {

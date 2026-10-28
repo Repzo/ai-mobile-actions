@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-10-28
 
 - The first version of the contract: the five actions the mobile app's assistant runs today —
   `start_visit`, `open_screen`, `open_activity`, `build_order` and `request_input` — with their

@@ -8,6 +8,12 @@ The app team owns the actions; this repository is where they are written down on
 backend reads the same definitions to tell the assistant what the phone can do, so nothing about
 the actions — or about the rep and their company — has to be hardcoded into a prompt.
 
+## Install
+
+```sh
+npm install repzo-ai-mobile-actions
+```
+
 ## How an action runs
 
 1. The assistant decides an action fits what the rep asked and sends an **action request**:
