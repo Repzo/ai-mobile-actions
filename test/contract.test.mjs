@@ -150,8 +150,47 @@ test("text transport: the app's result message", () => {
   );
 });
 
-test("the result envelope: a failure names its code, a cancellation needs nothing more", () => {
+test("the result envelope: a failure names its code, a cancellation carries nothing", () => {
   assert.equal(validateResult({ ref: "r", action: "a", status: "failed", error: "x" }), false);
   assert.equal(validateResult({ ref: "r", action: "a", status: "failed", error: "x", data: { code: "c" } }), true);
   assert.equal(validateResult({ ref: "r", action: "a", status: "cancelled" }), true);
+  assert.equal(validateResult({ ref: "r", action: "a", status: "cancelled", data: {} }), false);
+});
+
+test("results as the app sends them", () => {
+  const visit = ajv.compile(getAction("start_visit").result);
+  assert.equal(visit({ client_id: "1", client_name: "A" }), false, "started_at is always sent");
+  assert.equal(visit({ client_id: "1", client_name: "A", started_at: "2026-01-15T08:30:00Z" }), true);
+
+  const order = ajv.compile(getAction("build_order").result);
+  const base = { kind: "sales_order", client_id: "1", client_name: "A" };
+  assert.equal(
+    order({ ...base, added: [{ product: "P", qty: 2, requested_qty: 3 }], failed: [{ product: "Q", qty: 1, code: "out_of_stock" }] }),
+    true,
+    "a partial success lists its failed lines",
+  );
+  assert.equal(order({ ...base, added: [], failed: [{ product: "Q", code: "out_of_stock" }] }), false, "a failed line names its qty");
+
+  const input = ajv.compile(getAction("request_input").result);
+  assert.equal(input({ price: 0.35, seen_on: "2026-01-15", confirmed: false }), true);
+  assert.equal(input({ price: { amount: 1 } }), false, "answers are plain values");
+  assert.deepEqual(getAction("request_input").errors, [], "request_input never fails");
+});
+
+test("open_screen and open_activity report nothing; their failures only show on the card", () => {
+  for (const name of ["open_screen", "open_activity"]) {
+    const action = getAction(name);
+    assert.equal(action.reports_result, false);
+    assert.equal(action.result, undefined);
+    assert.ok(action.errors.length > 0, `${name}: the card's failure codes are documented`);
+    assert.match(action.description, /reports nothing back/);
+  }
+});
+
+test("build_order lists the visit failures that \"Start visit & build\" can bring", () => {
+  const orderCodes = new Set(getAction("build_order").errors.map((error) => error.code));
+  const lookup = new Set(["client_not_found", "no_location", "no_nearby_client", "error"]);
+  for (const { code } of getAction("start_visit").errors) {
+    if (!lookup.has(code)) assert.ok(orderCodes.has(code), code);
+  }
 });

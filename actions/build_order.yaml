@@ -8,18 +8,22 @@ since: 0.1.0
 reports_result: true
 description: |-
   Prepares an order, invoice or return WITH products: the phone adds the lines through the
-  app's own cart and opens it for the rep to review and submit (it does not submit anything).
-  Use it whenever the rep asks for an order, invoice or return with products — not
+  app's own cart and opens it for the rep to review and submit (it never submits anything
+  itself). Use it whenever the rep asks for an order, invoice or return with products — not
   open_activity — and never ask the rep to add the items by hand.
   - Products: each as the rep said it, plus product_variants (other-script spellings and
     transliterations). When a product matches several items, the rep picks one on the card.
   - qty: a positive number in the unit the rep said. unit only when the rep names one, in
     English ("carton", "box", "piece"). variant only for a named size or flavour ("330ml",
     "Diet").
-  - Client: as for open_activity — the visited client during an open visit, otherwise
-    client_name (with variants), client_id or nearest.
-  The result lists the lines added and the lines that failed (each with a code); summarize it
-  briefly.
+  - Client: during an open visit, leave it out — the visit's client is used, and naming another
+    client fails (visit_open_for_other_client). Otherwise send client_name (with variants),
+    client_id or nearest; the client is matched as for start_visit. With no visit and no client
+    it fails with client_required. When the document needs a visit, the card can offer "Start
+    visit & build", so any start_visit failure can come back too.
+  The action succeeds when at least one line was added: the result lists the lines added and the
+  lines that failed, each with a code — summarize both briefly. It fails as a whole when nothing
+  could be added (no_items_added) or the app can't take the order now.
 
 params:
   type: object
@@ -64,7 +68,7 @@ params:
 
 result:
   type: object
-  required: [kind, added, failed]
+  required: [kind, client_id, client_name, added, failed]
   properties:
     kind:
       type: string
@@ -81,17 +85,99 @@ result:
           product: { type: string, description: The product's name as saved. }
           qty: { type: number }
           unit: { type: string }
+          variant: { type: string }
+          requested_qty:
+            type: number
+            description: The quantity asked for, when the line was added with a different one.
     failed:
       type: array
-      description: The lines that could not be added, each with the reason's code.
+      description: The lines that could not be added.
       items:
         type: object
-        required: [product, code]
+        required: [product, qty, code]
         properties:
-          product: { type: string, description: The product as it was requested. }
+          product: { type: string, description: The product as it was asked for. }
           qty: { type: number }
-          code: { type: string }
-          error: { type: string, description: "Why, in plain words." }
+          code:
+            type: string
+            description: >-
+              Why: product_not_found, product_ambiguous (several matched and none was picked),
+              product_frozen, variant_not_found, unit_not_found, unit_not_allowed,
+              fractional_qty_not_allowed, out_of_stock, zero_price_not_allowed,
+              return_reason_required, or error.
+
+errors:
+  - code: visit_open_for_other_client
+    description: A visit is open at another client, data.client_name; the document can only be for it.
+    data:
+      client_name: { type: string }
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched data.client_name.
+    data:
+      client_name: { type: string }
+  - code: no_location
+    description: "nearest: the phone has no GPS fix."
+  - code: no_nearby_client
+    description: "nearest: none of the rep's clients is nearby."
+  - code: not_available
+    description: >-
+      Not available to the rep: the module or permission is off, or the client is off the rep's
+      route.
+  - code: visit_required
+    description: >-
+      The document needs an open visit at the client (data.client_id, data.client_name) — start
+      one first.
+    data:
+      client_id: { type: string }
+      client_name: { type: string }
+  - code: return_reason_required
+    description: The return needs a return reason.
+  - code: sales_screen_open
+    description: A sales screen is already open in the app.
+  - code: order_in_progress
+    description: An order is already in progress in the app.
+  - code: sales_not_ready
+    description: The app isn't ready to take sales; data.messages say why.
+    data:
+      messages: { type: array, items: { type: string } }
+  - code: mixed_cart
+    description: The app's cart already holds lines that can't be mixed with this document.
+  - code: no_items_added
+    description: No line could be added; data.failed says why, line by line.
+    data:
+      added: { type: array, maxItems: 0 }
+      failed: { type: array, items: { type: object } }
+  - code: error
+    description: Something else went wrong; error says what.
+  # From the visit the rep chose to start with "Start visit & build" — see start_visit.
+  - code: visit_already_open
+    description: "After \"Start visit & build\": a visit is already open, at data.client_name."
+    data:
+      client_name: { type: string }
+  - code: day_not_active
+    description: "After \"Start visit & build\": the rep's day is not active in the app."
+  - code: outside_route
+    description: "After \"Start visit & build\": the client is not on the rep's route."
+  - code: not_next_in_route
+    description: >-
+      After "Start visit & build": the client is not next on the route; data.next_client_names
+      lists the clients due next.
+    data:
+      next_client_names: { type: array, items: { type: string } }
+  - code: geo_zone_blocked
+    description: "After \"Start visit & build\": the rep's geo zone does not allow a visit here."
+  - code: out_of_geofence
+    description: >-
+      After "Start visit & build": the rep is outside the client's geofence; data.approval_flow
+      names the approval to request.
+    data:
+      approval_flow: { type: string, enum: [request_start_outside, request_location_edit] }
+  - code: busy
+    description: "After \"Start visit & build\": another visit start is already running."
+  - code: not_started
+    description: "After \"Start visit & build\": the app stopped the start and showed its own reason."
 
 examples:
   - says: اعمل طلبية مبيعات فيها ٢ سن كويك برتقال و ٣ بيبسي
@@ -119,9 +205,55 @@ examples:
           - { product: Sunquick Orange 200 ml, qty: 2, unit: Piece }
           - { product: Pepsi 330 ml, qty: 3, unit: Piece }
         failed: []
+  - says: Add 5 cartons of water and 2 of mango juice
+    request:
+      action: build_order
+      params:
+        kind: sales_order
+        items:
+          - { product: water, product_variants: [مياه, مي], qty: 5, unit: carton }
+          - { product: mango juice, product_variants: [عصير مانجو], qty: 2, unit: carton }
+      summary: Prepare a sales order with water and mango juice
+    result:
+      ref: "65f1a2b3c4d5e6f708192a3f:0"
+      action: build_order
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        added:
+          - { product: Mineral Water 500 ml, qty: 5, unit: Carton }
+        failed:
+          - { product: mango juice, qty: 2, code: out_of_stock }
+  - says: Prepare an invoice for Green Valley Grocery with 10 boxes of tea
+    request:
+      action: build_order
+      params:
+        kind: invoice
+        client_name: Green Valley Grocery
+        client_name_variants: [جرين فالي]
+        items:
+          - { product: tea, product_variants: [شاي], qty: 10, unit: box }
+      summary: Prepare an invoice for Green Valley Grocery
+    result:
+      ref: "65f1a2b3c4d5e6f708192a40:0"
+      action: build_order
+      status: failed
+      error: A visit is open at another client.
+      data:
+        code: visit_open_for_other_client
+        client_name: Al Noor Market
 
 maintainer_notes:
-  - List the codes a failed line can carry (no product matched, a unit the product doesn't have…).
   - >-
-    What happens when no visit is open and no client is given — does the app ask the rep to pick
-    one, or fail the action?
+    A return can fail with return_reason_required (for the whole order or a line), but the
+    action has no way to pass a reason, so the assistant can never fix it. Add an optional
+    return_reason — for the document and/or per line, matched by name against the company's
+    return reasons like products — or have the card ask the rep for it.
+  - >-
+    requested_qty: read here as the quantity asked for, when the line was added with a different
+    one. Confirm, and say when that happens (rounding to the unit, stock…).
+  - >-
+    product_ambiguous as a line failure: read here as "several products matched and the rep
+    picked none". Confirm.

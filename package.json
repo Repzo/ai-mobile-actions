@@ -4,6 +4,15 @@
   "description": "The contract between the Repzo AI chat and the Repzo mobile app: the device actions the assistant may ask the phone to run, their parameters, results and errors.",
   "private": true,
   "license": "UNLICENSED",
+  "author": "Repzo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Repzo/ai-mobile-actions.git"
+  },
+  "homepage": "https://github.com/Repzo/ai-mobile-actions#readme",
+  "bugs": {
+    "url": "https://github.com/Repzo/ai-mobile-actions/issues"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -22,7 +31,8 @@
     "actions",
     "schemas",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "generate": "node scripts/build.mjs",

@@ -125,3 +125,7 @@ npm install
 npm run generate   # actions/*.yaml → catalog.json, src/generated/*, the table above
 npm test           # checks the actions and generated files, type-checks, builds, runs the tests
 ```
+
+## License
+
+Proprietary — © Repzo. All rights reserved. See [LICENSE](LICENSE).

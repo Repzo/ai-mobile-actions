@@ -10,7 +10,9 @@ description: |-
   Opens a screen of the Repzo mobile app; a floating "back to assistant" button brings the rep
   back to the chat. For anything done for a specific client (a form, an order, a note, a photo,
   collection…) use open_activity instead. client_profile needs the client: send client_name and
-  client_name_variants.
+  client_name_variants (matched as for start_visit; the rep picks when several match).
+  The phone reports nothing back — not when the screen opens, not when it fails (a failure only
+  shows on the card) — so tell the rep what they will see, not that it is done.
 
 params:
   type: object
@@ -46,6 +48,19 @@ params:
   then:
     required: [client_name]
 
+# Shown on the card only — never reported back.
+errors:
+  - code: client_not_found
+    description: "client_profile: no client matched."
+  - code: visit_open_for_other_client
+    description: A visit is open at another client.
+  - code: no_active_visit
+    description: "visit: no visit is open."
+  - code: not_available
+    description: The screen is off for the rep (module or permission).
+  - code: error
+    description: Something else went wrong.
+
 examples:
   - says: افتح التقويم
     request:
@@ -63,6 +78,6 @@ examples:
 
 maintainer_notes:
   - >-
-    The app does not report a successful open (the rep is taken to the screen). Does it report a
-    failure (no matching client for client_profile, a screen the rep may not open)? If so, list
-    the codes in errors.
+    Failures never reach the assistant (card only), so it can't help — e.g. after
+    client_not_found it can't ask for another spelling. Report failures back as failed results
+    (successes can stay silent).

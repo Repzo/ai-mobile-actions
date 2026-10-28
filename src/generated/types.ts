@@ -64,8 +64,8 @@ export interface BuildOrderResult {
   /**
    * The client the document is for.
    */
-  client_id?: string;
-  client_name?: string;
+  client_id: string;
+  client_name: string;
   /**
    * The lines added to the cart, as the app's products.
    */
@@ -76,22 +76,26 @@ export interface BuildOrderResult {
     product: string;
     qty: number;
     unit?: string;
+    variant?: string;
+    /**
+     * The quantity asked for, when the line was added with a different one.
+     */
+    requested_qty?: number;
     [k: string]: unknown;
   }[];
   /**
-   * The lines that could not be added, each with the reason's code.
+   * The lines that could not be added.
    */
   failed: {
     /**
-     * The product as it was requested.
+     * The product as it was asked for.
      */
     product: string;
-    qty?: number;
-    code: string;
+    qty: number;
     /**
-     * Why, in plain words.
+     * Why: product_not_found, product_ambiguous (several matched and none was picked), product_frozen, variant_not_found, unit_not_found, unit_not_allowed, fractional_qty_not_allowed, out_of_stock, zero_price_not_allowed, return_reason_required, or error.
      */
-    error?: string;
+    code: string;
     [k: string]: unknown;
   }[];
   [k: string]: unknown;
@@ -192,7 +196,7 @@ export interface RequestInputParams {
    */
   fields: {
     /**
-     * The answer's key in the result.
+     * The answer's key in the result. Unique within the form.
      */
     key: string;
     /**
@@ -202,23 +206,23 @@ export interface RequestInputParams {
     type: "text" | "number" | "date" | "select" | "boolean";
     required?: boolean;
     /**
-     * The choices of a select field.
+     * The choices of a select field (one pick).
      *
      * @minItems 1
      */
     options?: string[];
     /**
-     * A prefilled answer — text, a number, an ISO date (YYYY-MM-DD) or true/false.
+     * A prefilled answer: text, a number, true/false, or for a date YYYY-MM-DD (any ISO 8601 string or epoch milliseconds also works). A default the phone can't use is left blank.
      */
     default?: string | number | boolean;
   }[];
 }
 
 /**
- * The rep's answers, keyed by each field's key.
+ * The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…). number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD. boolean: true or false — always present, even when the rep didn't touch it. Empty answers are left out.
  */
 export interface RequestInputResult {
-  [k: string]: unknown;
+  [k: string]: string | number | boolean;
 }
 
 export interface StartVisitParams {
@@ -252,13 +256,13 @@ export interface StartVisitResult {
    */
   client_name: string;
   /**
-   * The visited client's code.
+   * The visited client's code, when it has one.
    */
   client_code?: string;
   /**
    * When the visit started (ISO 8601).
    */
-  started_at?: string;
+  started_at: string;
   [k: string]: unknown;
 }
 

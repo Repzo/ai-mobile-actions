@@ -2,10 +2,12 @@
   "name": "repzo-ai-mobile-actions",
   "version": "0.1.0",
   "guidance": [
-    "The phone runs these actions itself, with the app's own checks (GPS geofence, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly, and never tell the rep to go somewhere in the app themselves.",
-    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it.",
+    "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there.",
     "Pick the action by what the rep wants: an order, invoice or return with products → build_order; one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.",
-    "When a result comes back failed, explain the error briefly and suggest a fix; never retry the same action on your own. Cancelled means the rep declined the action: don't run it again unless they ask.",
+    "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
+    "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
+    "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
     "Replies are read on a phone: keep them short."
   ],
   "transport": {
@@ -20,7 +22,7 @@
       "name": "build_order",
       "title": "Prepare an order with products",
       "summary": "Prepare a sales order, return sales order, invoice or return invoice with the products the rep names — the phone fills the app's cart and opens it for the rep to review and submit.",
-      "description": "Prepares an order, invoice or return WITH products: the phone adds the lines through the\napp's own cart and opens it for the rep to review and submit (it does not submit anything).\nUse it whenever the rep asks for an order, invoice or return with products — not\nopen_activity — and never ask the rep to add the items by hand.\n- Products: each as the rep said it, plus product_variants (other-script spellings and\n  transliterations). When a product matches several items, the rep picks one on the card.\n- qty: a positive number in the unit the rep said. unit only when the rep names one, in\n  English (\"carton\", \"box\", \"piece\"). variant only for a named size or flavour (\"330ml\",\n  \"Diet\").\n- Client: as for open_activity — the visited client during an open visit, otherwise\n  client_name (with variants), client_id or nearest.\nThe result lists the lines added and the lines that failed (each with a code); summarize it\nbriefly.",
+      "description": "Prepares an order, invoice or return WITH products: the phone adds the lines through the\napp's own cart and opens it for the rep to review and submit (it never submits anything\nitself). Use it whenever the rep asks for an order, invoice or return with products — not\nopen_activity — and never ask the rep to add the items by hand.\n- Products: each as the rep said it, plus product_variants (other-script spellings and\n  transliterations). When a product matches several items, the rep picks one on the card.\n- qty: a positive number in the unit the rep said. unit only when the rep names one, in\n  English (\"carton\", \"box\", \"piece\"). variant only for a named size or flavour (\"330ml\",\n  \"Diet\").\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails (visit_open_for_other_client). Otherwise send client_name (with variants),\n  client_id or nearest; the client is matched as for start_visit. With no visit and no client\n  it fails with client_required. When the document needs a visit, the card can offer \"Start\n  visit & build\", so any start_visit failure can come back too.\nThe action succeeds when at least one line was added: the result lists the lines added and the\nlines that failed, each with a code — summarize both briefly. It fails as a whole when nothing\ncould be added (no_items_added) or the app can't take the order now.",
       "since": "0.1.0",
       "reports_result": true,
       "params": {
@@ -120,6 +122,8 @@
         "type": "object",
         "required": [
           "kind",
+          "client_id",
+          "client_name",
           "added",
           "failed"
         ],
@@ -159,40 +163,194 @@
                 },
                 "unit": {
                   "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                },
+                "requested_qty": {
+                  "type": "number",
+                  "description": "The quantity asked for, when the line was added with a different one."
                 }
               }
             }
           },
           "failed": {
             "type": "array",
-            "description": "The lines that could not be added, each with the reason's code.",
+            "description": "The lines that could not be added.",
             "items": {
               "type": "object",
               "required": [
                 "product",
+                "qty",
                 "code"
               ],
               "properties": {
                 "product": {
                   "type": "string",
-                  "description": "The product as it was requested."
+                  "description": "The product as it was asked for."
                 },
                 "qty": {
                   "type": "number"
                 },
                 "code": {
-                  "type": "string"
-                },
-                "error": {
                   "type": "string",
-                  "description": "Why, in plain words."
+                  "description": "Why: product_not_found, product_ambiguous (several matched and none was picked), product_frozen, variant_not_found, unit_not_found, unit_not_allowed, fractional_qty_not_allowed, out_of_stock, zero_price_not_allowed, return_reason_required, or error."
                 }
               }
             }
           }
         }
       },
-      "errors": [],
+      "errors": [
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client, data.client_name; the document can only be for it.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
+        },
+        {
+          "code": "not_available",
+          "description": "Not available to the rep: the module or permission is off, or the client is off the rep's route."
+        },
+        {
+          "code": "visit_required",
+          "description": "The document needs an open visit at the client (data.client_id, data.client_name) — start one first.",
+          "data": {
+            "client_id": {
+              "type": "string"
+            },
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "return_reason_required",
+          "description": "The return needs a return reason."
+        },
+        {
+          "code": "sales_screen_open",
+          "description": "A sales screen is already open in the app."
+        },
+        {
+          "code": "order_in_progress",
+          "description": "An order is already in progress in the app."
+        },
+        {
+          "code": "sales_not_ready",
+          "description": "The app isn't ready to take sales; data.messages say why.",
+          "data": {
+            "messages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "mixed_cart",
+          "description": "The app's cart already holds lines that can't be mixed with this document."
+        },
+        {
+          "code": "no_items_added",
+          "description": "No line could be added; data.failed says why, line by line.",
+          "data": {
+            "added": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "failed": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        },
+        {
+          "code": "visit_already_open",
+          "description": "After \"Start visit & build\": a visit is already open, at data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "day_not_active",
+          "description": "After \"Start visit & build\": the rep's day is not active in the app."
+        },
+        {
+          "code": "outside_route",
+          "description": "After \"Start visit & build\": the client is not on the rep's route."
+        },
+        {
+          "code": "not_next_in_route",
+          "description": "After \"Start visit & build\": the client is not next on the route; data.next_client_names lists the clients due next.",
+          "data": {
+            "next_client_names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "geo_zone_blocked",
+          "description": "After \"Start visit & build\": the rep's geo zone does not allow a visit here."
+        },
+        {
+          "code": "out_of_geofence",
+          "description": "After \"Start visit & build\": the rep is outside the client's geofence; data.approval_flow names the approval to request.",
+          "data": {
+            "approval_flow": {
+              "type": "string",
+              "enum": [
+                "request_start_outside",
+                "request_location_edit"
+              ]
+            }
+          }
+        },
+        {
+          "code": "busy",
+          "description": "After \"Start visit & build\": another visit start is already running."
+        },
+        {
+          "code": "not_started",
+          "description": "After \"Start visit & build\": the app stopped the start and showed its own reason."
+        }
+      ],
       "examples": [
         {
           "says": "اعمل طلبية مبيعات فيها ٢ سن كويك برتقال و ٣ بيبسي",
@@ -243,6 +401,93 @@
               "failed": []
             }
           }
+        },
+        {
+          "says": "Add 5 cartons of water and 2 of mango juice",
+          "request": {
+            "action": "build_order",
+            "params": {
+              "kind": "sales_order",
+              "items": [
+                {
+                  "product": "water",
+                  "product_variants": [
+                    "مياه",
+                    "مي"
+                  ],
+                  "qty": 5,
+                  "unit": "carton"
+                },
+                {
+                  "product": "mango juice",
+                  "product_variants": [
+                    "عصير مانجو"
+                  ],
+                  "qty": 2,
+                  "unit": "carton"
+                }
+              ]
+            },
+            "summary": "Prepare a sales order with water and mango juice"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a3f:0",
+            "action": "build_order",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "added": [
+                {
+                  "product": "Mineral Water 500 ml",
+                  "qty": 5,
+                  "unit": "Carton"
+                }
+              ],
+              "failed": [
+                {
+                  "product": "mango juice",
+                  "qty": 2,
+                  "code": "out_of_stock"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "Prepare an invoice for Green Valley Grocery with 10 boxes of tea",
+          "request": {
+            "action": "build_order",
+            "params": {
+              "kind": "invoice",
+              "client_name": "Green Valley Grocery",
+              "client_name_variants": [
+                "جرين فالي"
+              ],
+              "items": [
+                {
+                  "product": "tea",
+                  "product_variants": [
+                    "شاي"
+                  ],
+                  "qty": 10,
+                  "unit": "box"
+                }
+              ]
+            },
+            "summary": "Prepare an invoice for Green Valley Grocery"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a40:0",
+            "action": "build_order",
+            "status": "failed",
+            "error": "A visit is open at another client.",
+            "data": {
+              "code": "visit_open_for_other_client",
+              "client_name": "Al Noor Market"
+            }
+          }
         }
       ]
     },
@@ -250,7 +495,7 @@
       "name": "open_activity",
       "title": "Open a client activity",
       "summary": "Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete.",
-      "description": "Opens an activity for a client so the rep completes it in the app; the phone handles the\nvisit, permissions and picking. Prefer it over open_screen for anything done for a client,\nand never tell the rep to go there themselves.\n- Client: during an open visit, leave the client out — the visited client is used. Otherwise\n  send client_name (with client_name_variants), or nearest: true, as for start_visit.\n- A specific form or retail-execution template: put its name in form_name or template_name.\n- An order, invoice or return WITH products is build_order, not this.",
+      "description": "Opens an activity for a client so the rep completes it in the app; the phone handles the\nvisit, permissions and picking. Prefer it over open_screen for anything done for a client,\nand never tell the rep to go there themselves.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;\n  the client is matched as for start_visit, and the rep picks when several match.\n- A specific form or retail-execution template: put its name in form_name or template_name.\n- An order, invoice or return WITH products is build_order, not this.\nThe phone reports nothing back — not when the activity opens, not when it fails (a failure\nonly shows on the card) — so tell the rep what they will see, not that it is done.",
       "since": "0.1.0",
       "reports_result": false,
       "params": {
@@ -324,7 +569,64 @@
           }
         }
       },
-      "errors": [],
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched."
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
+        },
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client."
+        },
+        {
+          "code": "visit_required",
+          "description": "The activity needs an open visit at the client."
+        },
+        {
+          "code": "not_available",
+          "description": "The activity is off for the rep (module or permission)."
+        },
+        {
+          "code": "form_not_found",
+          "description": "No form matched form_name."
+        },
+        {
+          "code": "template_not_found",
+          "description": "No retail-execution template matched template_name."
+        },
+        {
+          "code": "template_needs_sync",
+          "description": "The template isn't on the phone yet; the app has to sync first."
+        },
+        {
+          "code": "sales_screen_open",
+          "description": "A sales screen is already open in the app."
+        },
+        {
+          "code": "activity_screen_open",
+          "description": "Another activity screen is already open in the app."
+        },
+        {
+          "code": "order_in_progress",
+          "description": "An order is already in progress in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
       "examples": [
         {
           "says": "I want to fill a form",
@@ -368,7 +670,7 @@
       "name": "open_screen",
       "title": "Open an app screen",
       "summary": "Open a screen of the mobile app — clients, calendar, tasks, reports, approvals, a client's profile, and more.",
-      "description": "Opens a screen of the Repzo mobile app; a floating \"back to assistant\" button brings the rep\nback to the chat. For anything done for a specific client (a form, an order, a note, a photo,\ncollection…) use open_activity instead. client_profile needs the client: send client_name and\nclient_name_variants.",
+      "description": "Opens a screen of the Repzo mobile app; a floating \"back to assistant\" button brings the rep\nback to the chat. For anything done for a specific client (a form, an order, a note, a photo,\ncollection…) use open_activity instead. client_profile needs the client: send client_name and\nclient_name_variants (matched as for start_visit; the rep picks when several match).\nThe phone reports nothing back — not when the screen opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
       "since": "0.1.0",
       "reports_result": false,
       "params": {
@@ -425,7 +727,28 @@
           ]
         }
       },
-      "errors": [],
+      "errors": [
+        {
+          "code": "client_not_found",
+          "description": "client_profile: no client matched."
+        },
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client."
+        },
+        {
+          "code": "no_active_visit",
+          "description": "visit: no visit is open."
+        },
+        {
+          "code": "not_available",
+          "description": "The screen is off for the rep (module or permission)."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
       "examples": [
         {
           "says": "افتح التقويم",
@@ -457,7 +780,7 @@
       "name": "request_input",
       "title": "Ask the rep to fill a short form",
       "summary": "Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep tells you something to record or report.",
-      "description": "Shows the rep a short form and returns their answers. Use it when the rep tells you\ninformation to record or report — prices, quantities, feedback. Prefill each field's default\nwith anything you already know, and ask only for what you can't infer. For the app's own\nactivities (a note, a form…) use open_activity instead.",
+      "description": "Shows the rep a short form and returns their answers. Use it when the rep tells you\ninformation to record or report — prices, quantities, feedback. Prefill each field's default\nwith anything you already know, and ask only for what you can't infer. For the app's own\nactivities (a note, a form…) use open_activity instead.\nGive every field its own key. The rep either submits the form (success) or cancels it; it\nnever fails.",
       "since": "0.1.0",
       "reports_result": true,
       "params": {
@@ -488,7 +811,7 @@
                 "key": {
                   "type": "string",
                   "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
-                  "description": "The answer's key in the result."
+                  "description": "The answer's key in the result. Unique within the form."
                 },
                 "label": {
                   "type": "string",
@@ -515,10 +838,10 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "description": "The choices of a select field."
+                  "description": "The choices of a select field (one pick)."
                 },
                 "default": {
-                  "description": "A prefilled answer — text, a number, an ISO date (YYYY-MM-DD) or true/false.",
+                  "description": "A prefilled answer: text, a number, true/false, or for a date YYYY-MM-DD (any ISO 8601 string or epoch milliseconds also works). A default the phone can't use is left blank.",
                   "type": [
                     "string",
                     "number",
@@ -544,7 +867,14 @@
       },
       "result": {
         "type": "object",
-        "description": "The rep's answers, keyed by each field's key."
+        "description": "The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…). number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD. boolean: true or false — always present, even when the rep didn't touch it. Empty answers are left out.",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
       },
       "errors": [],
       "examples": [
@@ -574,10 +904,26 @@
                   "label": "Competitor",
                   "type": "text",
                   "required": true
+                },
+                {
+                  "key": "seen_on",
+                  "label": "Seen on",
+                  "type": "date"
                 }
               ]
             },
             "summary": "Record a competitor price"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a41:0",
+            "action": "request_input",
+            "status": "success",
+            "data": {
+              "product": "Pepsi 330 ml",
+              "price": 0.35,
+              "competitor": "Corner Mart",
+              "seen_on": "2026-01-15"
+            }
           }
         }
       ]
@@ -586,7 +932,7 @@
       "name": "start_visit",
       "title": "Start a visit",
       "summary": "Start a visit at one of the rep's clients — by name, by id, or the nearest client by live GPS.",
-      "description": "Starts a visit at a client from the rep's own client list. The phone finds the client itself,\nso never look the client up first.\n- By name: send client_name as the rep said it, plus client_name_variants.\n- Nearest, closest, \"near me\": send nearest: true. The phone ranks the rep's own clients by\n  live GPS distance and the rep picks one on the action card. Never ask the rep to search the\n  list themselves.\n- client_id only when you already have it from an earlier result.\nThe phone applies its own checks (GPS geofence, client verification) and may ask the rep to\nconfirm a visit outside the client's area. The result names the visited client, or says why\nthe visit could not start.",
+      "description": "Starts a visit at a client from the rep's own client list. The phone finds the client itself,\nso never look the client up first.\n- By name: send client_name as the rep said it, plus client_name_variants. The phone matches\n  the name and its variants, with a fuzzy fallback for spelling differences. When several\n  clients match, the card lists up to five and the rep picks one; a single match is\n  preselected.\n- Nearest, closest, \"near me\": send nearest: true. The card lists the rep's five closest\n  clients by live GPS, the closest preselected.\n- client_id only when you already have it from an earlier result.\nNever ask the rep to search for the client, and never choose between matches yourself.\nThe phone then applies its own rules — the rep's day, route and visit order, geo zone and\ngeofence — and may ask the rep to confirm a visit outside the client's area. The result names\nthe visited client, or says why the visit could not start. When no client matches, the rep can\nsend that back from the card (client_not_found, no_location, no_nearby_client).",
       "since": "0.1.0",
       "reports_result": true,
       "params": {
@@ -640,7 +986,8 @@
         "type": "object",
         "required": [
           "client_id",
-          "client_name"
+          "client_name",
+          "started_at"
         ],
         "properties": {
           "client_id": {
@@ -653,7 +1000,7 @@
           },
           "client_code": {
             "type": "string",
-            "description": "The visited client's code."
+            "description": "The visited client's code, when it has one."
           },
           "started_at": {
             "type": "string",
@@ -664,14 +1011,79 @@
       },
       "errors": [
         {
+          "code": "visit_already_open",
+          "description": "A visit is already open, at data.client_name; it has to end before another starts.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "day_not_active",
+          "description": "The rep's day is not active in the app."
+        },
+        {
+          "code": "outside_route",
+          "description": "The client is not on the rep's route."
+        },
+        {
+          "code": "not_next_in_route",
+          "description": "The route takes its clients in order and this one is not next; data.next_client_names lists the clients due next.",
+          "data": {
+            "next_client_names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "geo_zone_blocked",
+          "description": "The rep's geo zone does not allow a visit here."
+        },
+        {
           "code": "out_of_geofence",
-          "description": "The rep is outside the client's geofence, so the visit needs an approval first. Tell the rep; approval_flow names the request the app uses for it.",
+          "description": "The rep is outside the client's geofence, so the visit needs an approval first. data.approval_flow names it: request_start_outside (to start outside the area) or request_location_edit (to correct the client's location).",
           "data": {
             "approval_flow": {
               "type": "string",
-              "description": "The approval request to raise, e.g. request_location_edit."
+              "enum": [
+                "request_start_outside",
+                "request_location_edit"
+              ]
             }
           }
+        },
+        {
+          "code": "busy",
+          "description": "Another visit start is already running on the phone."
+        },
+        {
+          "code": "not_started",
+          "description": "The app stopped the start and showed its own reason to the rep."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
         }
       ],
       "examples": [
@@ -717,6 +1129,24 @@
               "code": "out_of_geofence",
               "approval_flow": "request_location_edit"
             }
+          }
+        },
+        {
+          "says": "Start a visit at Green Valley Grocery",
+          "request": {
+            "action": "start_visit",
+            "params": {
+              "client_name": "Green Valley Grocery",
+              "client_name_variants": [
+                "جرين فالي"
+              ]
+            },
+            "summary": "Start a visit at Green Valley Grocery"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192a3e:0",
+            "action": "start_visit",
+            "status": "cancelled"
           }
         }
       ]

@@ -2,10 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "action-result.schema.json",
   "title": "Action result",
-  "description": "What the phone reports back after running an action. On `success`, `data` matches the action's `result` schema. On `failed`, `error` says why in plain words and `data.code` names the failure (one of the action's `errors`). `cancelled` means the rep declined the action on its card.",
+  "description": "What the phone reports back after running an action. On `success`, `data` matches the action's `result` schema. On `failed`, `error` is a short English sentence for the assistant and `data.code` names the failure (one of the action's `errors`). `cancelled` means the rep declined the action on its card; it never carries `data`.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["ref", "action", "status"],
+  "required": [
+    "ref",
+    "action",
+    "status"
+  ],
   "properties": {
     "ref": {
       "type": "string",
@@ -19,7 +23,11 @@
     },
     "status": {
       "type": "string",
-      "enum": ["success", "failed", "cancelled"]
+      "enum": [
+        "success",
+        "failed",
+        "cancelled"
+      ]
     },
     "data": {
       "type": "object",
@@ -27,20 +35,52 @@
     },
     "error": {
       "type": "string",
-      "description": "On failure: why, in plain words."
+      "description": "On failure: why, in a short English sentence for the assistant."
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "failed" } } },
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
       "then": {
-        "required": ["error", "data"],
+        "required": [
+          "error",
+          "data"
+        ],
         "properties": {
           "data": {
             "type": "object",
-            "required": ["code"],
-            "properties": { "code": { "type": "string", "minLength": 1 } }
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "cancelled"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "data"
+          ]
         }
       }
     }

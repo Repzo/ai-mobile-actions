@@ -10,10 +10,13 @@ description: |-
   Opens an activity for a client so the rep completes it in the app; the phone handles the
   visit, permissions and picking. Prefer it over open_screen for anything done for a client,
   and never tell the rep to go there themselves.
-  - Client: during an open visit, leave the client out — the visited client is used. Otherwise
-    send client_name (with client_name_variants), or nearest: true, as for start_visit.
+  - Client: during an open visit, leave it out — the visit's client is used, and naming another
+    client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;
+    the client is matched as for start_visit, and the rep picks when several match.
   - A specific form or retail-execution template: put its name in form_name or template_name.
   - An order, invoice or return WITH products is build_order, not this.
+  The phone reports nothing back — not when the activity opens, not when it fails (a failure
+  only shows on the card) — so tell the rep what they will see, not that it is done.
 
 params:
   type: object
@@ -66,6 +69,37 @@ params:
       minLength: 1
       description: The name of a specific retail-execution template to open.
 
+# Shown on the card only — never reported back.
+errors:
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched.
+  - code: no_location
+    description: "nearest: the phone has no GPS fix."
+  - code: no_nearby_client
+    description: "nearest: none of the rep's clients is nearby."
+  - code: visit_open_for_other_client
+    description: A visit is open at another client.
+  - code: visit_required
+    description: The activity needs an open visit at the client.
+  - code: not_available
+    description: The activity is off for the rep (module or permission).
+  - code: form_not_found
+    description: No form matched form_name.
+  - code: template_not_found
+    description: No retail-execution template matched template_name.
+  - code: template_needs_sync
+    description: The template isn't on the phone yet; the app has to sync first.
+  - code: sales_screen_open
+    description: A sales screen is already open in the app.
+  - code: activity_screen_open
+    description: Another activity screen is already open in the app.
+  - code: order_in_progress
+    description: An order is already in progress in the app.
+  - code: error
+    description: Something else went wrong.
+
 examples:
   - says: I want to fill a form
     request:
@@ -88,6 +122,11 @@ examples:
 
 maintainer_notes:
   - >-
-    The app does not report a successful open. Does it report a failure (no visit and no client,
-    an activity the rep may not use, no form matching form_name)? If so, list the codes.
-  - Confirm which activities need an open visit and which open without one.
+    Failures never reach the assistant (card only), so it can't help — form_not_found is the
+    clearest case: it could offer the closest form names. Report failures back as failed results
+    (successes can stay silent).
+  - >-
+    The answers mention "prefill answers that couldn't be placed", but the contract has no
+    prefill parameter for open_activity. If the app accepts answers to prefill (a form's fields,
+    say), define it here — name, shape, which activities — or the assistant can't use it.
+  - Which activities need an open visit (visit_required) and which open without one?

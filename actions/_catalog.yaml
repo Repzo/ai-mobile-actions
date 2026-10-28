@@ -2,21 +2,28 @@
 
 guidance:
   - >-
-    The phone runs these actions itself, with the app's own checks (GPS geofence, client
-    verification, offline data). For anything an action covers, use the action — not the Repzo
-    API directly, and never tell the rep to go somewhere in the app themselves.
+    The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit
+    rules, client verification, offline data). For anything an action covers, use the action —
+    not the Repzo API directly — and never tell the rep to go somewhere in the app themselves.
   - >-
     One action per reply. The app shows the request's summary on an action card and runs the
-    action only when the rep confirms it.
+    action only when the rep confirms it there.
   - >-
     Pick the action by what the rep wants: an order, invoice or return with products →
     build_order; one of the app's own activities for a client (a form, a note, a photo,
     collection…) → open_activity; information to record or report (prices, quantities,
     feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.
   - >-
-    When a result comes back failed, explain the error briefly and suggest a fix; never retry the
-    same action on your own. Cancelled means the rep declined the action: don't run it again
-    unless they ask.
+    Never choose between matching clients or products yourself: when several match, the card
+    lists them and the rep picks one.
+  - >-
+    Don't say an action worked before its result arrives. open_screen and open_activity never
+    report back, not even a failure — say what the rep will see, not that it is done. A result
+    can come much later, or never: the rep may leave the card.
+  - >-
+    When a result comes back failed, explain it briefly in the rep's language (error is an
+    English sentence for you) and suggest a fix; never retry the same action on your own.
+    Cancelled means the rep declined: don't run it again unless they ask.
   - "Replies are read on a phone: keep them short."
 
 transport:

@@ -11,6 +11,8 @@ description: |-
   information to record or report — prices, quantities, feedback. Prefill each field's default
   with anything you already know, and ask only for what you can't infer. For the app's own
   activities (a note, a form…) use open_activity instead.
+  Give every field its own key. The rep either submits the form (success) or cancels it; it
+  never fails.
 
 params:
   type: object
@@ -32,7 +34,7 @@ params:
           key:
             type: string
             pattern: "^[A-Za-z][A-Za-z0-9_]*$"
-            description: The answer's key in the result.
+            description: The answer's key in the result. Unique within the form.
           label:
             type: string
             minLength: 1
@@ -45,9 +47,12 @@ params:
             type: array
             minItems: 1
             items: { type: string, minLength: 1 }
-            description: The choices of a select field.
+            description: The choices of a select field (one pick).
           default:
-            description: A prefilled answer — text, a number, an ISO date (YYYY-MM-DD) or true/false.
+            description: >-
+              A prefilled answer: text, a number, true/false, or for a date YYYY-MM-DD (any ISO
+              8601 string or epoch milliseconds also works). A default the phone can't use is left
+              blank.
             type: [string, number, boolean]
         if:
           properties: { type: { const: select } }
@@ -56,7 +61,15 @@ params:
 
 result:
   type: object
-  description: The rep's answers, keyed by each field's key.
+  description: >-
+    The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…).
+    number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD.
+    boolean: true or false — always present, even when the rep didn't touch it. Empty answers
+    are left out.
+  additionalProperties:
+    type: [string, number, boolean]
+
+errors: []
 
 examples:
   - says: The competitor sells Pepsi 330 ml at 0.35 here
@@ -68,10 +81,23 @@ examples:
           - { key: product, label: Product, type: text, required: true, default: Pepsi 330 ml }
           - { key: price, label: Price, type: number, required: true, default: 0.35 }
           - { key: competitor, label: Competitor, type: text, required: true }
+          - { key: seen_on, label: Seen on, type: date }
       summary: Record a competitor price
+    result:
+      ref: "65f1a2b3c4d5e6f708192a41:0"
+      action: request_input
+      status: success
+      data:
+        product: Pepsi 330 ml
+        price: 0.35
+        competitor: Corner Mart
+        seen_on: "2026-01-15"
 
 maintainer_notes:
   - >-
-    The result's shape is not confirmed: are the answers `data` itself (as this file says) or
-    nested, e.g. `data.values`? Fix `result` and add an example result.
-  - Confirm the date format the app expects for a date field's default (ISO YYYY-MM-DD assumed).
+    An untouched boolean comes back as false, so "no" and "didn't answer" look the same. Leave it
+    out unless the rep set it (or honour a default), so the assistant can tell them apart.
+  - >-
+    A select without options is shown as a plain text field; this contract requires options
+    instead, so the assistant never sends one.
+  - Does the card refuse to submit until the required fields are filled?

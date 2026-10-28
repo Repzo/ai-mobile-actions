@@ -103,7 +103,24 @@ for (const file of files) {
     continue;
   }
 
-  const errorCodes = new Set((raw.errors ?? []).map((item) => item.code));
+  // Each failure's data, as a schema: `code` plus the fields it documents.
+  const failureData = new Map();
+  for (const item of raw.errors ?? []) {
+    if (failureData.has(item.code)) fail(`${where}: error code '${item.code}' is listed twice`);
+    try {
+      failureData.set(
+        item.code,
+        ajv.compile({
+          type: "object",
+          required: ["code"],
+          properties: { code: { const: item.code }, ...(item.data ?? {}) },
+        }),
+      );
+    } catch (error) {
+      fail(`${where}: error ${item.code}: ${error.message}`);
+    }
+  }
+
   raw.examples.forEach((example, index) => {
     const at = `${where} examples[${index}]`;
     if (example.request.action !== raw.name) fail(`${at}: request.action must be ${raw.name}`);
@@ -112,15 +129,21 @@ for (const file of files) {
     }
     const answer = example.result;
     if (!answer) return;
-    if (answer.action !== raw.name) fail(`${at}: result.action must be ${raw.name}`);
-    if (answer.status === "success") {
-      if (!validateData) fail(`${at}: ${raw.name} does not report a result, so no success example`);
-      else if (!validateData(answer.data ?? {})) {
-        fail(`${at}: data: ${ajv.errorsText(validateData.errors, { dataVar: "data" })}`);
-      }
+    if (!raw.reports_result) {
+      fail(`${at}: ${raw.name} reports nothing back, so its examples carry no result`);
+      return;
     }
-    if (answer.status === "failed" && !errorCodes.has(answer.data?.code)) {
-      fail(`${at}: failure code '${answer.data?.code}' is not one of the action's errors`);
+    if (answer.action !== raw.name) fail(`${at}: result.action must be ${raw.name}`);
+    if (answer.status === "success" && !validateData(answer.data ?? {})) {
+      fail(`${at}: data: ${ajv.errorsText(validateData.errors, { dataVar: "data" })}`);
+    }
+    if (answer.status === "failed") {
+      const validateFailure = failureData.get(answer.data?.code);
+      if (!validateFailure) {
+        fail(`${at}: failure code '${answer.data?.code}' is not one of the action's errors`);
+      } else if (!validateFailure(answer.data)) {
+        fail(`${at}: data: ${ajv.errorsText(validateFailure.errors, { dataVar: "data" })}`);
+      }
     }
   });
 

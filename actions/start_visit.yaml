@@ -8,14 +8,18 @@ reports_result: true
 description: |-
   Starts a visit at a client from the rep's own client list. The phone finds the client itself,
   so never look the client up first.
-  - By name: send client_name as the rep said it, plus client_name_variants.
-  - Nearest, closest, "near me": send nearest: true. The phone ranks the rep's own clients by
-    live GPS distance and the rep picks one on the action card. Never ask the rep to search the
-    list themselves.
+  - By name: send client_name as the rep said it, plus client_name_variants. The phone matches
+    the name and its variants, with a fuzzy fallback for spelling differences. When several
+    clients match, the card lists up to five and the rep picks one; a single match is
+    preselected.
+  - Nearest, closest, "near me": send nearest: true. The card lists the rep's five closest
+    clients by live GPS, the closest preselected.
   - client_id only when you already have it from an earlier result.
-  The phone applies its own checks (GPS geofence, client verification) and may ask the rep to
-  confirm a visit outside the client's area. The result names the visited client, or says why
-  the visit could not start.
+  Never ask the rep to search for the client, and never choose between matches yourself.
+  The phone then applies its own rules — the rep's day, route and visit order, geo zone and
+  geofence — and may ask the rep to confirm a visit outside the client's area. The result names
+  the visited client, or says why the visit could not start. When no client matches, the rep can
+  send that back from the card (client_not_found, no_location, no_nearby_client).
 
 params:
   type: object
@@ -32,25 +36,55 @@ params:
 
 result:
   type: object
-  required: [client_id, client_name]
+  required: [client_id, client_name, started_at]
   properties:
     client_id: { type: string, description: The visited client's id. }
     client_name: { type: string, description: The visited client's name as saved. }
-    client_code: { type: string, description: The visited client's code. }
+    client_code: { type: string, description: "The visited client's code, when it has one." }
     started_at:
       type: string
       format: date-time
       description: When the visit started (ISO 8601).
 
+# In the order the phone checks them; the last three come from the client lookup.
 errors:
+  - code: visit_already_open
+    description: A visit is already open, at data.client_name; it has to end before another starts.
+    data:
+      client_name: { type: string }
+  - code: day_not_active
+    description: The rep's day is not active in the app.
+  - code: outside_route
+    description: The client is not on the rep's route.
+  - code: not_next_in_route
+    description: >-
+      The route takes its clients in order and this one is not next; data.next_client_names
+      lists the clients due next.
+    data:
+      next_client_names: { type: array, items: { type: string } }
+  - code: geo_zone_blocked
+    description: The rep's geo zone does not allow a visit here.
   - code: out_of_geofence
     description: >-
-      The rep is outside the client's geofence, so the visit needs an approval first. Tell the
-      rep; approval_flow names the request the app uses for it.
+      The rep is outside the client's geofence, so the visit needs an approval first.
+      data.approval_flow names it: request_start_outside (to start outside the area) or
+      request_location_edit (to correct the client's location).
     data:
-      approval_flow:
-        type: string
-        description: The approval request to raise, e.g. request_location_edit.
+      approval_flow: { type: string, enum: [request_start_outside, request_location_edit] }
+  - code: busy
+    description: Another visit start is already running on the phone.
+  - code: not_started
+    description: The app stopped the start and showed its own reason to the rep.
+  - code: error
+    description: Something else went wrong; error says what.
+  - code: client_not_found
+    description: No client matched data.client_name.
+    data:
+      client_name: { type: string }
+  - code: no_location
+    description: "nearest: the phone has no GPS fix."
+  - code: no_nearby_client
+    description: "nearest: none of the rep's clients is nearby."
 
 examples:
   - says: Start a visit at Al Noor Market
@@ -82,11 +116,29 @@ examples:
       data:
         code: out_of_geofence
         approval_flow: request_location_edit
+  - says: Start a visit at Green Valley Grocery
+    request:
+      action: start_visit
+      params:
+        client_name: Green Valley Grocery
+        client_name_variants: [جرين فالي]
+      summary: Start a visit at Green Valley Grocery
+    result:
+      ref: "65f1a2b3c4d5e6f708192a3e:0"
+      action: start_visit
+      status: cancelled
 
 maintainer_notes:
   - >-
-    Failure codes other than out_of_geofence are not listed yet (for example: no client matched,
-    a visit already open, an unverified client) — add each one the app reports.
+    not_started gives the assistant nothing to work with: the reason only shows on the screen.
+    Put that reason in `error` (or split it into specific codes) so the assistant can explain it
+    and suggest a fix.
   - >-
-    When several clients match client_name, does the app let the rep pick, or fail? Describe it
-    here once settled.
+    A request the app can't read — e.g. start_visit with no client_name, client_id or nearest —
+    is dropped: the chat says it couldn't be read and the assistant is never told. Send it back
+    as failed with code invalid_request and the reason in error, so the assistant can correct
+    itself. (Requests sent through the backend's run_mobile_action are validated before they
+    reach the phone; text-transport requests are not.)
+  - >-
+    client_not_found / no_location / no_nearby_client reach the assistant only when the rep taps
+    "Tell the assistant" on the empty card; otherwise nothing comes back.

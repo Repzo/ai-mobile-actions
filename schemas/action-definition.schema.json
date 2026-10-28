@@ -62,7 +62,7 @@
     },
     "errors": {
       "type": "array",
-      "description": "The failure codes the phone reports in `data.code`.",
+      "description": "The failure codes. An action that reports results sends them in `data.code` of a failed result; for one that reports nothing, they only show on the action card.",
       "items": {
         "type": "object",
         "additionalProperties": false,
