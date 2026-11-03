@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: sync_data
+title: Sync the phone
+summary: Send what the phone recorded offline (orders, visits, payments…) and say what is still waiting.
+since: 0.3.0
+reports_result: true
+description: |-
+  The phone records most work offline first and sends it when it can. This sends everything still
+  waiting now, then reports how many requests went through, how many are still waiting and how
+  many the server refused.
+  Use it for "sync", "send my data", "did my order go through?". When some are still waiting or
+  failed, say so plainly; refused requests need the rep to open the unsynced-requests screen.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [sent, pending, failed]
+  properties:
+    sent: { type: integer, minimum: 0, description: Requests sent in this sync. }
+    pending: { type: integer, minimum: 0, description: Requests still waiting to be sent. }
+    failed: { type: integer, minimum: 0, description: Requests the server refused. }
+    last_synced_at:
+      type: string
+      format: date-time
+      description: When the phone last finished a sync (ISO 8601).
+
+errors:
+  - code: offline
+    description: The phone is offline; nothing could be sent.
+  - code: sync_in_progress
+    description: A sync is already running on the phone.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Did my order go through?
+    request:
+      action: sync_data
+      params: {}
+      summary: Sync your phone now
+    result:
+      ref: "65f1a2b3c4d5e6f708192e01:0"
+      action: sync_data
+      status: success
+      data:
+        sent: 3
+        pending: 0
+        failed: 0
+        last_synced_at: "2026-01-15T10:02:00.000Z"
+  - says: زامن بياناتي
+    request:
+      action: sync_data
+      params: {}
+      summary: مزامنة الهاتف الآن
+    result:
+      ref: "65f1a2b3c4d5e6f708192e02:0"
+      action: sync_data
+      status: failed
+      error: The phone is offline.
+      data:
+        code: offline
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

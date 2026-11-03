@@ -85,6 +85,36 @@ test("the parameters reject what the app can't run", () => {
   const select = { key: "k", label: "K", type: "select" };
   assert.equal(requestInput({ title: "T", fields: [select] }), false, "a select field needs options");
   assert.equal(requestInput({ title: "T", fields: [{ ...select, options: ["a"] }] }), true);
+
+  const endVisit = ajv.compile(getAction("end_visit").params);
+  assert.equal(endVisit({}), true);
+  assert.equal(endVisit({ client_name: "A" }), false, "end_visit always ends the open visit");
+
+  const skipVisit = ajv.compile(getAction("skip_visit").params);
+  assert.equal(skipVisit({ client_name: "A" }), false, "skip_visit needs a reason");
+  assert.equal(skipVisit({ reason: "Closed" }), false, "skip_visit needs a client");
+  assert.equal(skipVisit({ client_name: "A", reason: "Closed" }), true);
+
+  const recordPayment = ajv.compile(getAction("record_payment").params);
+  assert.equal(recordPayment({ amount: 0 }), false, "amount > 0");
+  assert.equal(recordPayment({ amount: 10, method: "card" }), false, "cash or cheque only");
+
+  const scheduleVisit = ajv.compile(getAction("schedule_visit").params);
+  assert.equal(scheduleVisit({ client_name: "A", date: "15/01/2026" }), false, "dates are YYYY-MM-DD");
+
+  const buildTransfer = ajv.compile(getAction("build_transfer").params);
+  assert.equal(buildTransfer({ kind: "load", items: [{ product: "x", qty: 1 }] }), true);
+  assert.equal(buildTransfer({ kind: "move", items: [{ product: "x", qty: 1 }] }), false);
+});
+
+test("actions newer than the app's contract version are never offered to it", () => {
+  const added = ["end_visit", "start_day", "end_day", "navigate_to_client", "call_client", "sync_data",
+    "record_payment", "add_client", "build_transfer", "skip_visit", "schedule_visit", "create_work_order"];
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  for (const name of added) {
+    assert.ok(!offered("0.2.0").includes(name), `${name} is not offered to 0.2.0 apps`);
+    assert.ok(offered("0.3.0").includes(name), `${name} is offered from 0.3.0`);
+  }
 });
 
 test("the short list carries one line per action, filtered by the app's contract version", () => {

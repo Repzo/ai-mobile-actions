@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: end_visit
+title: End the current visit
+summary: End the rep's open visit, through the app's own end-of-visit checks.
+since: 0.3.0
+reports_result: true
+description: |-
+  Ends the visit that is open on the phone — there is no client to name. The card shows the open
+  visit and the rep confirms it; the phone then runs the same checks as its End visit button, in
+  order: no call still running, the visit's required jobs done (the rep may send a skip request
+  instead), shelf-scan missions, product lines, an order still in the cart, item status, and the
+  client's geofence (the rep may send a request to end outside it). The rep answers the visit
+  feedback before it closes.
+  Use it for "end / close / finish my visit", "I'm done here". Never end a visit the rep did not
+  ask to end. The result says when the visit ended, or why it couldn't — explain the reason and
+  what the rep can do in the app (finish the jobs, end the call…).
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [client_id, client_name, ended_at]
+  properties:
+    client_id: { type: string, description: The visited client's id. }
+    client_name: { type: string, description: The visited client's name as saved. }
+    ended_at:
+      type: string
+      format: date-time
+      description: When the visit ended (ISO 8601).
+    duration_minutes: { type: number, description: How long the visit lasted. }
+
+# In the order the phone checks them.
+errors:
+  - code: no_active_visit
+    description: No visit is open on the phone.
+  - code: call_in_progress
+    description: A call with the client is still running; it has to end first.
+  - code: jobs_pending
+    description: Required jobs of the visit are not done; data.jobs names them.
+    data:
+      jobs: { type: array, items: { type: string } }
+  - code: item_status_required
+    description: The visit's item status has to be submitted before it ends.
+  - code: out_of_geofence
+    description: >-
+      The rep is outside the client's geofence, so ending needs an approval; data.approval_flow
+      names it.
+    data:
+      approval_flow: { type: string, enum: [request_end_outside] }
+  - code: not_ended
+    description: The app stopped the end and showed the rep its own reason; error carries it.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: I'm done here, end the visit
+    request:
+      action: end_visit
+      params: {}
+      summary: End the visit at Al Noor Market
+    result:
+      ref: "65f1a2b3c4d5e6f708192b01:0"
+      action: end_visit
+      status: success
+      data:
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        ended_at: "2026-01-15T09:10:00.000Z"
+        duration_minutes: 40
+  - says: أنهِ الزيارة
+    request:
+      action: end_visit
+      params: {}
+      summary: إنهاء الزيارة الحالية
+    result:
+      ref: "65f1a2b3c4d5e6f708192b02:0"
+      action: end_visit
+      status: failed
+      error: Required jobs of the visit are not done.
+      data:
+        code: jobs_pending
+        jobs: [Shelf photo, Competitor prices]
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

@@ -32,11 +32,23 @@ definition only when it needs it.
 <!-- actions:start -->
 | Action | What it does | Reports a result | Since |
 | --- | --- | --- | --- |
+| [`add_client`](actions/add_client.yaml) | Open the Add client form filled in, located at the phone's current position, for the rep to submit. | no | 0.3.0 |
 | [`build_order`](actions/build_order.yaml) | Prepare a sales order, return sales order, invoice or return invoice with the products the rep names — the phone fills the app's cart and opens it for the rep to review and submit. | yes | 0.1.0 |
+| [`build_transfer`](actions/build_transfer.yaml) | Prepare a van load or unload with the products the rep names, for the rep to review and submit. | yes | 0.3.0 |
+| [`call_client`](actions/call_client.yaml) | Dial a client's saved phone number from the phone, after the rep confirms. | no | 0.3.0 |
+| [`create_work_order`](actions/create_work_order.yaml) | Open a new work order or work request (CMMS) filled in, for the rep to submit. | no | 0.3.0 |
+| [`end_day`](actions/end_day.yaml) | End the rep's working day, with the app's own end-of-day checks. | yes | 0.3.0 |
+| [`end_visit`](actions/end_visit.yaml) | End the rep's open visit, through the app's own end-of-visit checks. | yes | 0.3.0 |
+| [`navigate_to_client`](actions/navigate_to_client.yaml) | Open turn-by-turn directions to one of the rep's clients in the phone's maps app. | no | 0.3.0 |
 | [`open_activity`](actions/open_activity.yaml) | Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete. | no | 0.1.0 |
 | [`open_screen`](actions/open_screen.yaml) | Open a screen of the mobile app — clients, calendar, tasks, reports, approvals, a client's profile, and more. | no | 0.1.0 |
+| [`record_payment`](actions/record_payment.yaml) | Open a client's payment screen filled in with the amount, method and invoice, for the rep to submit. | no | 0.3.0 |
 | [`request_input`](actions/request_input.yaml) | Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep tells you something to record or report. | yes | 0.1.0 |
+| [`schedule_visit`](actions/schedule_visit.yaml) | Add a client to today's journey, or schedule a visit to them on a date. | yes | 0.3.0 |
+| [`skip_visit`](actions/skip_visit.yaml) | Ask to skip a client on today's route, with the reason — an admin approves the skip. | yes | 0.3.0 |
+| [`start_day`](actions/start_day.yaml) | Start the rep's working day, with the app's own start-of-day checks. | yes | 0.3.0 |
 | [`start_visit`](actions/start_visit.yaml) | Start a visit at one of the rep's clients — by name, by id, or the nearest client by live GPS. | yes | 0.1.0 |
+| [`sync_data`](actions/sync_data.yaml) | Send what the phone recorded offline (orders, visits, payments…) and say what is still waiting. | yes | 0.3.0 |
 <!-- actions:end -->
 
 Each file in [`actions/`](actions) holds the full definition: the instructions the assistant reads,
