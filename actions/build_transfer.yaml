@@ -1,0 +1,141 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: build_transfer
+title: Prepare a van load or unload
+summary: Prepare a van load or unload with the products the rep names, for the rep to review and submit.
+since: 0.3.0
+reports_result: true
+description: |-
+  Prepares a stock transfer for the rep's van — a load into the van, or an unload out of it — in
+  the app's own transfer screen, then opens it for the rep to review and submit (it never submits
+  anything itself). Products, quantities, units and variants work as in build_order. For an
+  unload, destination says where the stock goes when the rep names it: the main warehouse, the
+  return warehouse, or another van (the phone asks which one).
+  The phone applies the company's rules (which transfers the rep may make, load limits, van
+  stock). The action succeeds when at least one line was added: summarize the lines added and
+  the lines that failed.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [kind, items]
+  properties:
+    kind:
+      type: string
+      enum: [load, unload]
+      description: "load: into the rep's van. unload: out of it."
+    destination:
+      type: string
+      enum: [main_warehouse, return_warehouse, van]
+      description: "unload only: where the stock goes, when the rep names it."
+    items:
+      type: array
+      minItems: 1
+      maxItems: 30
+      items:
+        type: object
+        additionalProperties: false
+        required: [product, qty]
+        properties:
+          product: { $shared: product }
+          product_variants: { $shared: product_variants }
+          qty:
+            type: number
+            exclusiveMinimum: 0
+            description: How many, in the unit the rep said.
+          unit:
+            type: string
+            minLength: 1
+            description: Only when the rep names a unit, in English — "carton", "box", "piece".
+          variant:
+            type: string
+            minLength: 1
+            description: Only for a named size or flavour — "330ml", "Diet".
+    comment:
+      type: string
+      minLength: 1
+      description: A comment for the transfer, when the rep gives one.
+
+result:
+  type: object
+  required: [kind, added, failed]
+  properties:
+    kind: { type: string, enum: [load, unload] }
+    added:
+      type: array
+      description: The lines added to the transfer, as the app's products.
+      items:
+        type: object
+        required: [product, qty]
+        properties:
+          product: { type: string, description: The product's name as saved. }
+          qty: { type: number }
+          unit: { type: string }
+          variant: { type: string }
+    failed:
+      type: array
+      description: The lines that could not be added.
+      items:
+        type: object
+        required: [product, qty, code]
+        properties:
+          product: { type: string, description: The product as it was asked for. }
+          qty: { type: number }
+          code:
+            type: string
+            description: >-
+              Why: product_not_found, product_ambiguous (several matched and none was picked),
+              variant_not_found, unit_not_found, unit_not_allowed, fractional_qty_not_allowed,
+              out_of_stock (unload: not enough in the van), over_load_limit, or error.
+
+errors:
+  - code: not_available
+    description: This transfer is off for the rep (permission), or the rep has no van warehouse.
+  - code: destination_not_allowed
+    description: The rep may not unload to data.destination.
+    data:
+      destination: { type: string }
+  - code: sales_screen_open
+    description: A sales or transfer screen is already open in the app.
+  - code: order_in_progress
+    description: An order or transfer is already being prepared in the app.
+  - code: no_items_added
+    description: No line could be added; data.failed says why, line by line.
+    data:
+      added: { type: array, maxItems: 0 }
+      failed: { type: array, items: { type: object } }
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Load 10 cartons of Pepsi 330ml into my van
+    request:
+      action: build_transfer
+      params:
+        kind: load
+        items:
+          - { product: Pepsi, product_variants: [بيبسي], qty: 10, unit: carton, variant: 330ml }
+      summary: Load 10 cartons of Pepsi 330ml into your van
+    result:
+      ref: "65f1a2b3c4d5e6f708192f01:0"
+      action: build_transfer
+      status: success
+      data:
+        kind: load
+        added:
+          - { product: Pepsi, qty: 10, unit: Carton, variant: 330ml }
+        failed: []
+  - says: نزّل 5 علب ميرندا للمستودع الرئيسي
+    request:
+      action: build_transfer
+      params:
+        kind: unload
+        destination: main_warehouse
+        items:
+          - { product: ميرندا, product_variants: [Mirinda], qty: 5, unit: box }
+      summary: تنزيل 5 علب ميرندا إلى المستودع الرئيسي
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.
+  - >-
+    A separate action rather than new build_order kinds: a new enum value on an existing action
+    can't be held back by `since`, so older apps would be offered kinds they can't run.

@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: skip_visit
+title: Request to skip a planned visit
+summary: Ask to skip a client on today's route, with the reason — an admin approves the skip.
+since: 0.3.0
+reports_result: true
+description: |-
+  For a route that takes its clients in order: sends the app's skip request for a client on
+  today's route, with the rep's reason, so the next client can be visited. An admin approves or
+  rejects it; until then the stop stays on the route. Only for clients on today's route.
+  Client: send client_name (with client_name_variants) or client_id, matched among today's route
+  stops. Send the reason as the rep said it; ask for one if they gave none.
+  The result says the request was sent (or approved at once) — don't say the stop is skipped
+  before it is approved.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [reason]
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    reason:
+      type: string
+      minLength: 1
+      description: Why the rep skips the visit, as they said it.
+  anyOf:
+    - required: [client_name]
+    - required: [client_id]
+
+result:
+  type: object
+  required: [client_id, client_name, status]
+  properties:
+    client_id: { type: string }
+    client_name: { type: string, description: The client's name as saved. }
+    status:
+      type: string
+      enum: [pending, approved]
+      description: The skip request's status.
+
+errors:
+  - code: client_not_found
+    description: No stop on today's route matched.
+    data:
+      client_name: { type: string }
+  - code: not_on_route
+    description: The client isn't on today's route.
+  - code: not_available
+    description: Skipping route stops is off for the rep (permission), or the route has no order.
+  - code: already_requested
+    description: A skip request for this stop is already pending.
+  - code: offline
+    description: The phone is offline; the request needs a connection.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Skip Green Valley Grocery, they're closed today
+    request:
+      action: skip_visit
+      params:
+        client_name: Green Valley Grocery
+        client_name_variants: [جرين فالي]
+        reason: Closed today
+      summary: Ask to skip Green Valley Grocery (closed today)
+    result:
+      ref: "65f1a2b3c4d5e6f708193001:0"
+      action: skip_visit
+      status: success
+      data:
+        client_id: 65f1a2b3c4d5e6f708192a02
+        client_name: Green Valley Grocery
+        status: pending
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

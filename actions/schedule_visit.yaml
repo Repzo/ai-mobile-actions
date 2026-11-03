@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: schedule_visit
+title: Schedule a visit
+summary: Add a client to today's journey, or schedule a visit to them on a date.
+since: 0.3.0
+reports_result: true
+description: |-
+  Adds a visit to the rep's calendar: today (the client joins today's journey on the phone at
+  once) or on the date the rep names. Client: send client_name (with client_name_variants) or
+  client_id — matched as for start_visit, and the rep picks when several match. date and time as
+  the rep said them, converted to YYYY-MM-DD and HH:mm in the rep's time zone; leave date out
+  for today.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    date:
+      type: string
+      pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+      description: The visit's date (YYYY-MM-DD); leave it out for today.
+    time:
+      type: string
+      pattern: "^\\d{2}:\\d{2}$"
+      description: The visit's time (HH:mm, 24-hour), when the rep names one.
+    note:
+      type: string
+      minLength: 1
+      description: A note for the visit, when the rep gives one.
+  anyOf:
+    - required: [client_name]
+    - required: [client_id]
+
+result:
+  type: object
+  required: [client_id, client_name, date]
+  properties:
+    client_id: { type: string }
+    client_name: { type: string, description: The client's name as saved. }
+    date: { type: string, description: The scheduled date (YYYY-MM-DD). }
+    time: { type: string, description: "The scheduled time (HH:mm), when set." }
+
+errors:
+  - code: client_not_found
+    description: No client matched data.client_name.
+    data:
+      client_name: { type: string }
+  - code: not_available
+    description: Adding visits to the calendar is off for the rep (permission).
+  - code: already_scheduled
+    description: The client is already scheduled on that date.
+  - code: date_in_past
+    description: The date is before today.
+  - code: offline
+    description: The phone is offline; scheduling needs a connection.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Add Al Noor Market to today's visits
+    request:
+      action: schedule_visit
+      params:
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+      summary: Add Al Noor Market to today's journey
+    result:
+      ref: "65f1a2b3c4d5e6f708193101:0"
+      action: schedule_visit
+      status: success
+      data:
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        date: "2026-01-15"
+  - says: حط زيارة لجرين فالي يوم الأحد الساعة 10
+    request:
+      action: schedule_visit
+      params:
+        client_name: جرين فالي
+        client_name_variants: [Green Valley, Green Valley Grocery]
+        date: "2026-01-18"
+        time: "10:00"
+      summary: جدولة زيارة لجرين فالي يوم الأحد الساعة 10:00
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

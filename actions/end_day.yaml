@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: end_day
+title: End the working day
+summary: End the rep's working day, with the app's own end-of-day checks.
+since: 0.3.0
+reports_result: true
+description: |-
+  Ends the rep's working day, as the End day button does. The rep confirms on the card (and
+  enters the odometer reading when the company tracks it); the phone refuses while a visit is
+  open, and checks that it is online (or that offline days are allowed), that nothing is waiting
+  to sync when the company requires it, and that it is not before the allowed end time.
+  Use it only when the rep asks to end the day. If a visit is open, the result says so — offer
+  end_visit first.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [ended_at]
+  properties:
+    ended_at:
+      type: string
+      format: date-time
+      description: When the day ended (ISO 8601).
+
+errors:
+  - code: no_active_day
+    description: The rep's day is not active.
+  - code: visit_open
+    description: A visit is still open, at data.client_name; it has to end first.
+    data:
+      client_name: { type: string }
+  - code: offline_not_allowed
+    description: The phone is offline and the company doesn't allow ending the day offline.
+  - code: must_sync_first
+    description: Requests are still waiting to sync, and the company requires a sync first.
+  - code: before_allowed_time
+    description: It is before the company's allowed time to end the day.
+  - code: not_ended
+    description: The app stopped the end and showed the rep its own reason; error carries it.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: End my day
+    request:
+      action: end_day
+      params: {}
+      summary: End your working day
+    result:
+      ref: "65f1a2b3c4d5e6f708192d01:0"
+      action: end_day
+      status: failed
+      error: A visit is still open at Al Noor Market.
+      data:
+        code: visit_open
+        client_name: Al Noor Market
+  - says: خلصت شغلي اليوم، أنهِ يومي
+    request:
+      action: end_day
+      params: {}
+      summary: إنهاء يوم العمل
+    result:
+      ref: "65f1a2b3c4d5e6f708192d02:0"
+      action: end_day
+      status: success
+      data:
+        ended_at: "2026-01-15T17:05:00.000Z"
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

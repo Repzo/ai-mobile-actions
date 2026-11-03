@@ -3,7 +3,7 @@ import type { MobileActionsCatalog } from "../types.js";
 
 export const CATALOG: MobileActionsCatalog = {
   "name": "repzo-ai-mobile-actions",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "guidance": [
     "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves.",
     "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there.",
@@ -21,6 +21,86 @@ export const CATALOG: MobileActionsCatalog = {
     }
   },
   "actions": [
+    {
+      "name": "add_client",
+      "title": "Add a client",
+      "summary": "Open the Add client form filled in, located at the phone's current position, for the rep to submit.",
+      "description": "Prepares a new client — the rep reviews and submits it in the app's own form. When the rep may\nonly request new clients, the same form sends a request for an admin to approve instead. Use\nit rather than creating the client through the API: the location comes from the phone's GPS\nand the client appears in the rep's offline list at once.\nSend what the rep said: the name, and phone, email or address when given. use_current_location\npins the client where the rep stands — send it when the rep is at the client (\"I'm at a new\nshop…\"). Never invent details.\nThe phone reports nothing back; tell the rep the form opens filled in for them to check and\nsubmit.",
+      "since": "0.3.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it."
+          },
+          "local_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name in the other script (Arabic or Latin), when the rep gives both."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's phone number as the rep said it."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's email."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's address or area."
+          },
+          "use_current_location": {
+            "type": "boolean",
+            "const": true,
+            "description": "Pin the client at the phone's current GPS position."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "not_available",
+          "description": "Adding or requesting clients is off for the rep (permission)."
+        },
+        {
+          "code": "no_location",
+          "description": "use_current_location: the phone has no GPS fix."
+        },
+        {
+          "code": "activity_screen_open",
+          "description": "The Add client form is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "I'm at a new shop, Sunrise Bakery, phone 0790000000 — add it",
+          "request": {
+            "action": "add_client",
+            "params": {
+              "name": "Sunrise Bakery",
+              "local_name": "مخبز الشروق",
+              "phone": "0790000000",
+              "use_current_location": true
+            },
+            "summary": "Add Sunrise Bakery at your current location"
+          }
+        }
+      ]
+    },
     {
       "name": "build_order",
       "title": "Prepare an order with products",
@@ -500,6 +580,755 @@ export const CATALOG: MobileActionsCatalog = {
       ]
     },
     {
+      "name": "build_transfer",
+      "title": "Prepare a van load or unload",
+      "summary": "Prepare a van load or unload with the products the rep names, for the rep to review and submit.",
+      "description": "Prepares a stock transfer for the rep's van — a load into the van, or an unload out of it — in\nthe app's own transfer screen, then opens it for the rep to review and submit (it never submits\nanything itself). Products, quantities, units and variants work as in build_order. For an\nunload, destination says where the stock goes when the rep names it: the main warehouse, the\nreturn warehouse, or another van (the phone asks which one).\nThe phone applies the company's rules (which transfers the rep may make, load limits, van\nstock). The action succeeds when at least one line was added: summarize the lines added and\nthe lines that failed.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "items"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "load",
+              "unload"
+            ],
+            "description": "load: into the rep's van. unload: out of it."
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "main_warehouse",
+              "return_warehouse",
+              "van"
+            ],
+            "description": "unload only: where the stock goes, when the rep names it."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The product as the rep said it."
+                },
+                "product_variants": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Other spellings of product — products are often saved in English or under a local Arabic name: send other-script spellings and transliterations, e.g. \"بيبسي\" → [\"Pepsi\"]."
+                },
+                "qty": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "How many, in the unit the rep said."
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only when the rep names a unit, in English — \"carton\", \"box\", \"piece\"."
+                },
+                "variant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only for a named size or flavour — \"330ml\", \"Diet\"."
+                }
+              }
+            }
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comment for the transfer, when the rep gives one."
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "added",
+          "failed"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "load",
+              "unload"
+            ]
+          },
+          "added": {
+            "type": "array",
+            "description": "The lines added to the transfer, as the app's products.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "failed": {
+            "type": "array",
+            "description": "The lines that could not be added.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty",
+                "code"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product as it was asked for."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Why: product_not_found, product_ambiguous (several matched and none was picked), variant_not_found, unit_not_found, unit_not_allowed, fractional_qty_not_allowed, out_of_stock (unload: not enough in the van), over_load_limit, or error."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "not_available",
+          "description": "This transfer is off for the rep (permission), or the rep has no van warehouse."
+        },
+        {
+          "code": "destination_not_allowed",
+          "description": "The rep may not unload to data.destination.",
+          "data": {
+            "destination": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "sales_screen_open",
+          "description": "A sales or transfer screen is already open in the app."
+        },
+        {
+          "code": "order_in_progress",
+          "description": "An order or transfer is already being prepared in the app."
+        },
+        {
+          "code": "no_items_added",
+          "description": "No line could be added; data.failed says why, line by line.",
+          "data": {
+            "added": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "failed": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Load 10 cartons of Pepsi 330ml into my van",
+          "request": {
+            "action": "build_transfer",
+            "params": {
+              "kind": "load",
+              "items": [
+                {
+                  "product": "Pepsi",
+                  "product_variants": [
+                    "بيبسي"
+                  ],
+                  "qty": 10,
+                  "unit": "carton",
+                  "variant": "330ml"
+                }
+              ]
+            },
+            "summary": "Load 10 cartons of Pepsi 330ml into your van"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192f01:0",
+            "action": "build_transfer",
+            "status": "success",
+            "data": {
+              "kind": "load",
+              "added": [
+                {
+                  "product": "Pepsi",
+                  "qty": 10,
+                  "unit": "Carton",
+                  "variant": "330ml"
+                }
+              ],
+              "failed": []
+            }
+          }
+        },
+        {
+          "says": "نزّل 5 علب ميرندا للمستودع الرئيسي",
+          "request": {
+            "action": "build_transfer",
+            "params": {
+              "kind": "unload",
+              "destination": "main_warehouse",
+              "items": [
+                {
+                  "product": "ميرندا",
+                  "product_variants": [
+                    "Mirinda"
+                  ],
+                  "qty": 5,
+                  "unit": "box"
+                }
+              ]
+            },
+            "summary": "تنزيل 5 علب ميرندا إلى المستودع الرئيسي"
+          }
+        }
+      ]
+    },
+    {
+      "name": "call_client",
+      "title": "Call a client",
+      "summary": "Dial a client's saved phone number from the phone, after the rep confirms.",
+      "description": "Dials the client's saved phone number in the phone's dialer, once the rep confirms on the card.\nClient: during an open visit leave it out (the visit's client is used); otherwise send\nclient_name (with client_name_variants) or client_id — matched as for start_visit, and the rep\npicks when several match. Never read out or guess a number yourself.\nThe phone reports nothing back.",
+      "since": "0.3.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched."
+        },
+        {
+          "code": "no_phone",
+          "description": "The client has no saved phone number."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Call Green Valley Grocery",
+          "request": {
+            "action": "call_client",
+            "params": {
+              "client_name": "Green Valley Grocery",
+              "client_name_variants": [
+                "جرين فالي"
+              ]
+            },
+            "summary": "Call Green Valley Grocery"
+          }
+        },
+        {
+          "says": "اتصل بالعميل",
+          "request": {
+            "action": "call_client",
+            "params": {},
+            "summary": "الاتصال بعميل الزيارة الحالية"
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_work_order",
+      "title": "Create a work order or work request",
+      "summary": "Open a new work order or work request (CMMS) filled in, for the rep to submit.",
+      "description": "For companies with the maintenance (CMMS) module: prepares a work order — a job the rep or a\ntechnician does — or a work request — a problem reported for an admin to turn into a job — in\nthe app's own form, filled in with what the rep said; the rep reviews and submits it.\ndescription is the problem or job as the rep put it. asset_name names the equipment when the\nrep mentions it (matched in the phone's asset list, the rep picks when several match);\nclient_name the client it's at. Assigning the job to someone else stays with the rep.\nThe phone reports nothing back; tell the rep the form opens filled in.",
+      "since": "0.3.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "description"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "work_order",
+              "work_request"
+            ],
+            "description": "work_order: a job to do. work_request: a problem to report."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The problem or the job, as the rep put it."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A short title, when the rep gives one."
+          },
+          "asset_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The equipment it's about, as the rep named it."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "Only when the rep says how urgent it is."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "not_available",
+          "description": "The CMMS module or the permission to create this is off for the rep."
+        },
+        {
+          "code": "asset_not_found",
+          "description": "No asset matched asset_name."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched client_name."
+        },
+        {
+          "code": "activity_screen_open",
+          "description": "The form is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "The fridge at Al Noor Market isn't cooling, report it",
+          "request": {
+            "action": "create_work_order",
+            "params": {
+              "kind": "work_request",
+              "description": "The fridge isn't cooling",
+              "asset_name": "Fridge",
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ],
+              "priority": "high"
+            },
+            "summary": "Report the fridge at Al Noor Market (not cooling)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "end_day",
+      "title": "End the working day",
+      "summary": "End the rep's working day, with the app's own end-of-day checks.",
+      "description": "Ends the rep's working day, as the End day button does. The rep confirms on the card (and\nenters the odometer reading when the company tracks it); the phone refuses while a visit is\nopen, and checks that it is online (or that offline days are allowed), that nothing is waiting\nto sync when the company requires it, and that it is not before the allowed end time.\nUse it only when the rep asks to end the day. If a visit is open, the result says so — offer\nend_visit first.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "ended_at"
+        ],
+        "properties": {
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the day ended (ISO 8601)."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "no_active_day",
+          "description": "The rep's day is not active."
+        },
+        {
+          "code": "visit_open",
+          "description": "A visit is still open, at data.client_name; it has to end first.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "offline_not_allowed",
+          "description": "The phone is offline and the company doesn't allow ending the day offline."
+        },
+        {
+          "code": "must_sync_first",
+          "description": "Requests are still waiting to sync, and the company requires a sync first."
+        },
+        {
+          "code": "before_allowed_time",
+          "description": "It is before the company's allowed time to end the day."
+        },
+        {
+          "code": "not_ended",
+          "description": "The app stopped the end and showed the rep its own reason; error carries it."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "End my day",
+          "request": {
+            "action": "end_day",
+            "params": {},
+            "summary": "End your working day"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d01:0",
+            "action": "end_day",
+            "status": "failed",
+            "error": "A visit is still open at Al Noor Market.",
+            "data": {
+              "code": "visit_open",
+              "client_name": "Al Noor Market"
+            }
+          }
+        },
+        {
+          "says": "خلصت شغلي اليوم، أنهِ يومي",
+          "request": {
+            "action": "end_day",
+            "params": {},
+            "summary": "إنهاء يوم العمل"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d02:0",
+            "action": "end_day",
+            "status": "success",
+            "data": {
+              "ended_at": "2026-01-15T17:05:00.000Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "end_visit",
+      "title": "End the current visit",
+      "summary": "End the rep's open visit, through the app's own end-of-visit checks.",
+      "description": "Ends the visit that is open on the phone — there is no client to name. The card shows the open\nvisit and the rep confirms it; the phone then runs the same checks as its End visit button, in\norder: no call still running, the visit's required jobs done (the rep may send a skip request\ninstead), shelf-scan missions, product lines, an order still in the cart, item status, and the\nclient's geofence (the rep may send a request to end outside it). The rep answers the visit\nfeedback before it closes.\nUse it for \"end / close / finish my visit\", \"I'm done here\". Never end a visit the rep did not\nask to end. The result says when the visit ended, or why it couldn't — explain the reason and\nwhat the rep can do in the app (finish the jobs, end the call…).",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name",
+          "ended_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The visited client's id."
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The visited client's name as saved."
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the visit ended (ISO 8601)."
+          },
+          "duration_minutes": {
+            "type": "number",
+            "description": "How long the visit lasted."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "no_active_visit",
+          "description": "No visit is open on the phone."
+        },
+        {
+          "code": "call_in_progress",
+          "description": "A call with the client is still running; it has to end first."
+        },
+        {
+          "code": "jobs_pending",
+          "description": "Required jobs of the visit are not done; data.jobs names them.",
+          "data": {
+            "jobs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "item_status_required",
+          "description": "The visit's item status has to be submitted before it ends."
+        },
+        {
+          "code": "out_of_geofence",
+          "description": "The rep is outside the client's geofence, so ending needs an approval; data.approval_flow names it.",
+          "data": {
+            "approval_flow": {
+              "type": "string",
+              "enum": [
+                "request_end_outside"
+              ]
+            }
+          }
+        },
+        {
+          "code": "not_ended",
+          "description": "The app stopped the end and showed the rep its own reason; error carries it."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "I'm done here, end the visit",
+          "request": {
+            "action": "end_visit",
+            "params": {},
+            "summary": "End the visit at Al Noor Market"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192b01:0",
+            "action": "end_visit",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "ended_at": "2026-01-15T09:10:00.000Z",
+              "duration_minutes": 40
+            }
+          }
+        },
+        {
+          "says": "أنهِ الزيارة",
+          "request": {
+            "action": "end_visit",
+            "params": {},
+            "summary": "إنهاء الزيارة الحالية"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192b02:0",
+            "action": "end_visit",
+            "status": "failed",
+            "error": "Required jobs of the visit are not done.",
+            "data": {
+              "code": "jobs_pending",
+              "jobs": [
+                "Shelf photo",
+                "Competitor prices"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "navigate_to_client",
+      "title": "Directions to a client",
+      "summary": "Open turn-by-turn directions to one of the rep's clients in the phone's maps app.",
+      "description": "Opens directions from the rep's position to a client, in the phone's own maps app. Client:\nduring an open visit leave it out (the visit's client is used); otherwise send client_name\n(with client_name_variants), client_id or nearest — matched as for start_visit, and the rep\npicks when several match.\nThe phone reports nothing back; tell the rep the directions open in their maps app.",
+      "since": "0.3.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched."
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
+        },
+        {
+          "code": "no_client_location",
+          "description": "The client has no saved location to navigate to."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "How do I get to Al Noor Market?",
+          "request": {
+            "action": "navigate_to_client",
+            "params": {
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ]
+            },
+            "summary": "Directions to Al Noor Market"
+          }
+        },
+        {
+          "says": "ودّيني على أقرب عميل",
+          "request": {
+            "action": "navigate_to_client",
+            "params": {
+              "nearest": true
+            },
+            "summary": "الاتجاهات إلى أقرب عميل"
+          }
+        }
+      ]
+    },
+    {
       "name": "open_activity",
       "title": "Open a client activity",
       "summary": "Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete.",
@@ -839,6 +1668,131 @@ export const CATALOG: MobileActionsCatalog = {
       ]
     },
     {
+      "name": "record_payment",
+      "title": "Record a payment",
+      "summary": "Open a client's payment screen filled in with the amount, method and invoice, for the rep to submit.",
+      "description": "Prepares a payment from a client — the rep reviews and submits it in the app's own payment\nscreen; the phone never submits a payment itself. Send the amount the rep said, the method\n(cash or cheque) and, when the rep names the invoice being paid, invoice_ref as they said it.\nCheque details (bank, branch, number, photo) stay with the rep.\nClient: during an open visit leave it out (the visit's client is used); otherwise send\nclient_name (with client_name_variants) or client_id. The phone applies the company's rules —\npayments outside a visit, payments not tied to an invoice, partial payments.\nThe phone reports nothing back; tell the rep the screen opens filled in for them to check and\nsubmit.",
+      "since": "0.3.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amount"
+        ],
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The amount, in the company's currency."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "cheque"
+            ],
+            "description": "How the client pays; leave it out when the rep didn't say."
+          },
+          "invoice_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The invoice being paid, as the rep named it (its number or serial)."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A note for the payment, when the rep gives one."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched."
+        },
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client."
+        },
+        {
+          "code": "visit_required",
+          "description": "The company only takes payments during a visit."
+        },
+        {
+          "code": "not_available",
+          "description": "Payments are off for the rep (module or permission)."
+        },
+        {
+          "code": "invoice_not_found",
+          "description": "No open invoice of the client matched invoice_ref."
+        },
+        {
+          "code": "partial_payment_not_allowed",
+          "description": "The amount is less than the invoice's balance, and partial payments are off."
+        },
+        {
+          "code": "sales_screen_open",
+          "description": "A sales or payment screen is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Al Noor Market paid 150 cash",
+          "request": {
+            "action": "record_payment",
+            "params": {
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ],
+              "amount": 150,
+              "method": "cash"
+            },
+            "summary": "Record a cash payment of 150 from Al Noor Market"
+          }
+        },
+        {
+          "says": "سجّل دفعة 75 على فاتورة INV-2041",
+          "request": {
+            "action": "record_payment",
+            "params": {
+              "amount": 75,
+              "invoice_ref": "INV-2041"
+            },
+            "summary": "تسجيل دفعة 75 على الفاتورة INV-2041"
+          }
+        }
+      ]
+    },
+    {
       "name": "request_input",
       "title": "Ask the rep to fill a short form",
       "summary": "Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep tells you something to record or report.",
@@ -985,6 +1939,393 @@ export const CATALOG: MobileActionsCatalog = {
               "price": 0.35,
               "competitor": "Corner Mart",
               "seen_on": "2026-01-15"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "schedule_visit",
+      "title": "Schedule a visit",
+      "summary": "Add a client to today's journey, or schedule a visit to them on a date.",
+      "description": "Adds a visit to the rep's calendar: today (the client joins today's journey on the phone at\nonce) or on the date the rep names. Client: send client_name (with client_name_variants) or\nclient_id — matched as for start_visit, and the rep picks when several match. date and time as\nthe rep said them, converted to YYYY-MM-DD and HH:mm in the rep's time zone; leave date out\nfor today.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The visit's date (YYYY-MM-DD); leave it out for today."
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "The visit's time (HH:mm, 24-hour), when the rep names one."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A note for the visit, when the rep gives one."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "client_name"
+            ]
+          },
+          {
+            "required": [
+              "client_id"
+            ]
+          }
+        ]
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name",
+          "date"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The client's name as saved."
+          },
+          "date": {
+            "type": "string",
+            "description": "The scheduled date (YYYY-MM-DD)."
+          },
+          "time": {
+            "type": "string",
+            "description": "The scheduled time (HH:mm), when set."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_not_found",
+          "description": "No client matched data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "not_available",
+          "description": "Adding visits to the calendar is off for the rep (permission)."
+        },
+        {
+          "code": "already_scheduled",
+          "description": "The client is already scheduled on that date."
+        },
+        {
+          "code": "date_in_past",
+          "description": "The date is before today."
+        },
+        {
+          "code": "offline",
+          "description": "The phone is offline; scheduling needs a connection."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Add Al Noor Market to today's visits",
+          "request": {
+            "action": "schedule_visit",
+            "params": {
+              "client_name": "Al Noor Market",
+              "client_name_variants": [
+                "النور ماركت"
+              ]
+            },
+            "summary": "Add Al Noor Market to today's journey"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193101:0",
+            "action": "schedule_visit",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "date": "2026-01-15"
+            }
+          }
+        },
+        {
+          "says": "حط زيارة لجرين فالي يوم الأحد الساعة 10",
+          "request": {
+            "action": "schedule_visit",
+            "params": {
+              "client_name": "جرين فالي",
+              "client_name_variants": [
+                "Green Valley",
+                "Green Valley Grocery"
+              ],
+              "date": "2026-01-18",
+              "time": "10:00"
+            },
+            "summary": "جدولة زيارة لجرين فالي يوم الأحد الساعة 10:00"
+          }
+        }
+      ]
+    },
+    {
+      "name": "skip_visit",
+      "title": "Request to skip a planned visit",
+      "summary": "Ask to skip a client on today's route, with the reason — an admin approves the skip.",
+      "description": "For a route that takes its clients in order: sends the app's skip request for a client on\ntoday's route, with the rep's reason, so the next client can be visited. An admin approves or\nrejects it; until then the stop stays on the route. Only for clients on today's route.\nClient: send client_name (with client_name_variants) or client_id, matched among today's route\nstops. Send the reason as the rep said it; ask for one if they gave none.\nThe result says the request was sent (or approved at once) — don't say the stop is skipped\nbefore it is approved.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why the rep skips the visit, as they said it."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "client_name"
+            ]
+          },
+          {
+            "required": [
+              "client_id"
+            ]
+          }
+        ]
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name",
+          "status"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The client's name as saved."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved"
+            ],
+            "description": "The skip request's status."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_not_found",
+          "description": "No stop on today's route matched.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "not_on_route",
+          "description": "The client isn't on today's route."
+        },
+        {
+          "code": "not_available",
+          "description": "Skipping route stops is off for the rep (permission), or the route has no order."
+        },
+        {
+          "code": "already_requested",
+          "description": "A skip request for this stop is already pending."
+        },
+        {
+          "code": "offline",
+          "description": "The phone is offline; the request needs a connection."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Skip Green Valley Grocery, they're closed today",
+          "request": {
+            "action": "skip_visit",
+            "params": {
+              "client_name": "Green Valley Grocery",
+              "client_name_variants": [
+                "جرين فالي"
+              ],
+              "reason": "Closed today"
+            },
+            "summary": "Ask to skip Green Valley Grocery (closed today)"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193001:0",
+            "action": "skip_visit",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a02",
+              "client_name": "Green Valley Grocery",
+              "status": "pending"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "start_day",
+      "title": "Start the working day",
+      "summary": "Start the rep's working day, with the app's own start-of-day checks.",
+      "description": "Starts the rep's working day, as the Start day button does. The rep confirms on the card; the\nphone then checks that it is online (or that the company allows an offline day), that it has a\nGPS fix, that the geo zone allows it, that nothing is waiting to sync when the company requires\nit, and that it is within the allowed start time. Visits can only start once the day is active.\nUse it for \"start my day\", \"I'm starting work\". The result says when the day started, or why it\ncouldn't — explain it briefly.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "started_at"
+        ],
+        "properties": {
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the day started (ISO 8601)."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "day_already_active",
+          "description": "The rep's day is already active."
+        },
+        {
+          "code": "offline_not_allowed",
+          "description": "The phone is offline and the company doesn't allow starting the day offline."
+        },
+        {
+          "code": "no_location",
+          "description": "The phone has no GPS fix."
+        },
+        {
+          "code": "geo_zone_blocked",
+          "description": "The rep's geo zone doesn't allow starting the day here."
+        },
+        {
+          "code": "must_sync_first",
+          "description": "Requests are still waiting to sync, and the company requires a sync first."
+        },
+        {
+          "code": "outside_time_window",
+          "description": "It is outside the company's allowed time to start the day."
+        },
+        {
+          "code": "not_started",
+          "description": "The app stopped the start and showed the rep its own reason; error carries it."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Start my day",
+          "request": {
+            "action": "start_day",
+            "params": {},
+            "summary": "Start your working day"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192c01:0",
+            "action": "start_day",
+            "status": "success",
+            "data": {
+              "started_at": "2026-01-15T07:55:00.000Z"
+            }
+          }
+        },
+        {
+          "says": "ابدأ يومي",
+          "request": {
+            "action": "start_day",
+            "params": {},
+            "summary": "بدء يوم العمل"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192c02:0",
+            "action": "start_day",
+            "status": "failed",
+            "error": "Requests are still waiting to sync.",
+            "data": {
+              "code": "must_sync_first"
             }
           }
         }
@@ -1209,6 +2550,101 @@ export const CATALOG: MobileActionsCatalog = {
             "ref": "65f1a2b3c4d5e6f708192a3e:0",
             "action": "start_visit",
             "status": "cancelled"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sync_data",
+      "title": "Sync the phone",
+      "summary": "Send what the phone recorded offline (orders, visits, payments…) and say what is still waiting.",
+      "description": "The phone records most work offline first and sends it when it can. This sends everything still\nwaiting now, then reports how many requests went through, how many are still waiting and how\nmany the server refused.\nUse it for \"sync\", \"send my data\", \"did my order go through?\". When some are still waiting or\nfailed, say so plainly; refused requests need the rep to open the unsynced-requests screen.",
+      "since": "0.3.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "sent",
+          "pending",
+          "failed"
+        ],
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Requests sent in this sync."
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Requests still waiting to be sent."
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Requests the server refused."
+          },
+          "last_synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the phone last finished a sync (ISO 8601)."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "offline",
+          "description": "The phone is offline; nothing could be sent."
+        },
+        {
+          "code": "sync_in_progress",
+          "description": "A sync is already running on the phone."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Did my order go through?",
+          "request": {
+            "action": "sync_data",
+            "params": {},
+            "summary": "Sync your phone now"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192e01:0",
+            "action": "sync_data",
+            "status": "success",
+            "data": {
+              "sent": 3,
+              "pending": 0,
+              "failed": 0,
+              "last_synced_at": "2026-01-15T10:02:00.000Z"
+            }
+          }
+        },
+        {
+          "says": "زامن بياناتي",
+          "request": {
+            "action": "sync_data",
+            "params": {},
+            "summary": "مزامنة الهاتف الآن"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192e02:0",
+            "action": "sync_data",
+            "status": "failed",
+            "error": "The phone is offline.",
+            "data": {
+              "code": "offline"
+            }
           }
         }
       ]

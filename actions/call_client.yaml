@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: call_client
+title: Call a client
+summary: Dial a client's saved phone number from the phone, after the rep confirms.
+since: 0.3.0
+reports_result: false
+description: |-
+  Dials the client's saved phone number in the phone's dialer, once the rep confirms on the card.
+  Client: during an open visit leave it out (the visit's client is used); otherwise send
+  client_name (with client_name_variants) or client_id — matched as for start_visit, and the rep
+  picks when several match. Never read out or guess a number yourself.
+  The phone reports nothing back.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+
+# Shown on the card only — never reported back.
+errors:
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched.
+  - code: no_phone
+    description: The client has no saved phone number.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: Call Green Valley Grocery
+    request:
+      action: call_client
+      params:
+        client_name: Green Valley Grocery
+        client_name_variants: [جرين فالي]
+      summary: Call Green Valley Grocery
+  - says: اتصل بالعميل
+    request:
+      action: call_client
+      params: {}
+      summary: الاتصال بعميل الزيارة الحالية
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

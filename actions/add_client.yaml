@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: add_client
+title: Add a client
+summary: Open the Add client form filled in, located at the phone's current position, for the rep to submit.
+since: 0.3.0
+reports_result: false
+description: |-
+  Prepares a new client — the rep reviews and submits it in the app's own form. When the rep may
+  only request new clients, the same form sends a request for an admin to approve instead. Use
+  it rather than creating the client through the API: the location comes from the phone's GPS
+  and the client appears in the rep's offline list at once.
+  Send what the rep said: the name, and phone, email or address when given. use_current_location
+  pins the client where the rep stands — send it when the rep is at the client ("I'm at a new
+  shop…"). Never invent details.
+  The phone reports nothing back; tell the rep the form opens filled in for them to check and
+  submit.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [name]
+  properties:
+    name:
+      type: string
+      minLength: 1
+      description: The client's name as the rep said it.
+    local_name:
+      type: string
+      minLength: 1
+      description: The name in the other script (Arabic or Latin), when the rep gives both.
+    phone:
+      type: string
+      minLength: 1
+      description: The client's phone number as the rep said it.
+    email:
+      type: string
+      minLength: 1
+      description: The client's email.
+    address:
+      type: string
+      minLength: 1
+      description: The client's address or area.
+    use_current_location:
+      type: boolean
+      const: true
+      description: Pin the client at the phone's current GPS position.
+
+# Shown on the card only — never reported back.
+errors:
+  - code: not_available
+    description: Adding or requesting clients is off for the rep (permission).
+  - code: no_location
+    description: "use_current_location: the phone has no GPS fix."
+  - code: activity_screen_open
+    description: The Add client form is already open in the app.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: I'm at a new shop, Sunrise Bakery, phone 0790000000 — add it
+    request:
+      action: add_client
+      params:
+        name: Sunrise Bakery
+        local_name: مخبز الشروق
+        phone: "0790000000"
+        use_current_location: true
+      summary: Add Sunrise Bakery at your current location
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.
