@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: navigate_to_client
+title: Directions to a client
+summary: Open turn-by-turn directions to one of the rep's clients in the phone's maps app.
+since: 0.3.0
+reports_result: false
+description: |-
+  Opens directions from the rep's position to a client, in the phone's own maps app. Client:
+  during an open visit leave it out (the visit's client is used); otherwise send client_name
+  (with client_name_variants), client_id or nearest — matched as for start_visit, and the rep
+  picks when several match.
+  The phone reports nothing back; tell the rep the directions open in their maps app.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    nearest: { $shared: nearest }
+
+# Shown on the card only — never reported back.
+errors:
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched.
+  - code: no_location
+    description: "nearest: the phone has no GPS fix."
+  - code: no_nearby_client
+    description: "nearest: none of the rep's clients is nearby."
+  - code: no_client_location
+    description: The client has no saved location to navigate to.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: How do I get to Al Noor Market?
+    request:
+      action: navigate_to_client
+      params:
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+      summary: Directions to Al Noor Market
+  - says: ودّيني على أقرب عميل
+    request:
+      action: navigate_to_client
+      params: { nearest: true }
+      summary: الاتجاهات إلى أقرب عميل
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

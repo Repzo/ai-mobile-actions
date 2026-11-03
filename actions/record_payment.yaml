@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: record_payment
+title: Record a payment
+summary: Open a client's payment screen filled in with the amount, method and invoice, for the rep to submit.
+since: 0.3.0
+reports_result: false
+description: |-
+  Prepares a payment from a client — the rep reviews and submits it in the app's own payment
+  screen; the phone never submits a payment itself. Send the amount the rep said, the method
+  (cash or cheque) and, when the rep names the invoice being paid, invoice_ref as they said it.
+  Cheque details (bank, branch, number, photo) stay with the rep.
+  Client: during an open visit leave it out (the visit's client is used); otherwise send
+  client_name (with client_name_variants) or client_id. The phone applies the company's rules —
+  payments outside a visit, payments not tied to an invoice, partial payments.
+  The phone reports nothing back; tell the rep the screen opens filled in for them to check and
+  submit.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [amount]
+  properties:
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    amount:
+      type: number
+      exclusiveMinimum: 0
+      description: The amount, in the company's currency.
+    method:
+      type: string
+      enum: [cash, cheque]
+      description: How the client pays; leave it out when the rep didn't say.
+    invoice_ref:
+      type: string
+      minLength: 1
+      description: The invoice being paid, as the rep named it (its number or serial).
+    note:
+      type: string
+      minLength: 1
+      description: A note for the payment, when the rep gives one.
+
+# Shown on the card only — never reported back.
+errors:
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched.
+  - code: visit_open_for_other_client
+    description: A visit is open at another client.
+  - code: visit_required
+    description: The company only takes payments during a visit.
+  - code: not_available
+    description: Payments are off for the rep (module or permission).
+  - code: invoice_not_found
+    description: No open invoice of the client matched invoice_ref.
+  - code: partial_payment_not_allowed
+    description: The amount is less than the invoice's balance, and partial payments are off.
+  - code: sales_screen_open
+    description: A sales or payment screen is already open in the app.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: Al Noor Market paid 150 cash
+    request:
+      action: record_payment
+      params:
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+        amount: 150
+        method: cash
+      summary: Record a cash payment of 150 from Al Noor Market
+  - says: سجّل دفعة 75 على فاتورة INV-2041
+    request:
+      action: record_payment
+      params: { amount: 75, invoice_ref: INV-2041 }
+      summary: تسجيل دفعة 75 على الفاتورة INV-2041
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

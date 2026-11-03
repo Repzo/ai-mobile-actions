@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: create_work_order
+title: Create a work order or work request
+summary: Open a new work order or work request (CMMS) filled in, for the rep to submit.
+since: 0.3.0
+reports_result: false
+description: |-
+  For companies with the maintenance (CMMS) module: prepares a work order — a job the rep or a
+  technician does — or a work request — a problem reported for an admin to turn into a job — in
+  the app's own form, filled in with what the rep said; the rep reviews and submits it.
+  description is the problem or job as the rep put it. asset_name names the equipment when the
+  rep mentions it (matched in the phone's asset list, the rep picks when several match);
+  client_name the client it's at. Assigning the job to someone else stays with the rep.
+  The phone reports nothing back; tell the rep the form opens filled in.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [kind, description]
+  properties:
+    kind:
+      type: string
+      enum: [work_order, work_request]
+      description: "work_order: a job to do. work_request: a problem to report."
+    description:
+      type: string
+      minLength: 1
+      description: The problem or the job, as the rep put it.
+    title:
+      type: string
+      minLength: 1
+      description: A short title, when the rep gives one.
+    asset_name:
+      type: string
+      minLength: 1
+      description: The equipment it's about, as the rep named it.
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    priority:
+      type: string
+      enum: [low, medium, high]
+      description: Only when the rep says how urgent it is.
+
+# Shown on the card only — never reported back.
+errors:
+  - code: not_available
+    description: The CMMS module or the permission to create this is off for the rep.
+  - code: asset_not_found
+    description: No asset matched asset_name.
+  - code: client_not_found
+    description: No client matched client_name.
+  - code: activity_screen_open
+    description: The form is already open in the app.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: The fridge at Al Noor Market isn't cooling, report it
+    request:
+      action: create_work_order
+      params:
+        kind: work_request
+        description: The fridge isn't cooling
+        asset_name: Fridge
+        client_name: Al Noor Market
+        client_name_variants: [النور ماركت]
+        priority: high
+      summary: Report the fridge at Al Noor Market (not cooling)
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

@@ -14,6 +14,18 @@ description: |-
     client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;
     the client is matched as for start_visit, and the rep picks when several match.
   - A specific form or retail-execution template: put its name in form_name or template_name.
+  - Visit: form, form_history, collection, reminders, clm, client_history, media and
+    ai_sales_order open without a visit; sales_order too when the rep may order outside a visit.
+    The rest need an open visit at the client — the card offers "Start visit & continue", and
+    any start_visit check can stop it.
+  - prefill opens the screen already filled for the rep to review and submit — use it whenever
+    the rep tells you what to record in a form, a note or a reminder, so they never type it
+    again. form (with form_name): {"<the question's key words as the rep said them> | <the same
+    words in English, or in Arabic if the rep wrote English>": answer} — 1–4 words per side, not
+    a full sentence; form questions are often saved in another language than the rep speaks.
+    note: {"content": …}. reminders: {"name": …, "content": …, "from"?: …, "to"?: …} — opens a
+    new reminder instead of the list. Numbers as numbers, yes/no as true/false, dates as
+    YYYY-MM-DD, free text as text. Photos, signatures, scans and list picks stay with the rep.
   - An order, invoice or return WITH products is build_order, not this.
   The phone reports nothing back — not when the activity opens, not when it fails (a failure
   only shows on the card) — so tell the rep what they will see, not that it is done.
@@ -68,6 +80,19 @@ params:
       type: string
       minLength: 1
       description: The name of a specific retail-execution template to open.
+    prefill:
+      type: object
+      minProperties: 1
+      maxProperties: 40
+      description: >-
+        Answers to place before the screen opens (form with form_name, note, reminders) — see
+        the description for the keys. The card previews each answer and the rep confirms; answers
+        that match no field are shown as not placed.
+      additionalProperties:
+        anyOf:
+          - type: [string, number, boolean]
+          - type: array
+            items: { type: string }
 
 # Shown on the card only — never reported back.
 errors:
@@ -119,14 +144,27 @@ examples:
       action: open_activity
       params: { activity: form, form_name: Shelf audit }
       summary: Open the "Shelf audit" form
+  - says: "عبّئ نموذج Shelf audit: العصير متوفر، وملاحظة البلانوغرام: الرفوف مرتبة"
+    request:
+      action: open_activity
+      params:
+        activity: form
+        form_name: Shelf audit
+        prefill:
+          "العصير | juice": true
+          "البلانوغرام | planogram": الرفوف مرتبة
+      summary: فتح نموذج Shelf audit معبّأً للمراجعة
+  - says: Add a reminder to collect the payment from Al Noor Market on 2026-11-02
+    request:
+      action: open_activity
+      params:
+        activity: reminders
+        client_name: Al Noor Market
+        prefill: { name: Collect payment, content: Collect the overdue payment, from: "2026-11-02" }
+      summary: New reminder for Al Noor Market
 
 maintainer_notes:
   - >-
     Failures never reach the assistant (card only), so it can't help — form_not_found is the
     clearest case: it could offer the closest form names. Report failures back as failed results
     (successes can stay silent).
-  - >-
-    The answers mention "prefill answers that couldn't be placed", but the contract has no
-    prefill parameter for open_activity. If the app accepts answers to prefill (a form's fields,
-    say), define it here — name, shape, which activities — or the assistant can't use it.
-  - Which activities need an open visit (visit_required) and which open without one?

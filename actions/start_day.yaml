@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: start_day
+title: Start the working day
+summary: Start the rep's working day, with the app's own start-of-day checks.
+since: 0.3.0
+reports_result: true
+description: |-
+  Starts the rep's working day, as the Start day button does. The rep confirms on the card; the
+  phone then checks that it is online (or that the company allows an offline day), that it has a
+  GPS fix, that the geo zone allows it, that nothing is waiting to sync when the company requires
+  it, and that it is within the allowed start time. Visits can only start once the day is active.
+  Use it for "start my day", "I'm starting work". The result says when the day started, or why it
+  couldn't — explain it briefly.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [started_at]
+  properties:
+    started_at:
+      type: string
+      format: date-time
+      description: When the day started (ISO 8601).
+
+errors:
+  - code: day_already_active
+    description: The rep's day is already active.
+  - code: offline_not_allowed
+    description: The phone is offline and the company doesn't allow starting the day offline.
+  - code: no_location
+    description: The phone has no GPS fix.
+  - code: geo_zone_blocked
+    description: The rep's geo zone doesn't allow starting the day here.
+  - code: must_sync_first
+    description: Requests are still waiting to sync, and the company requires a sync first.
+  - code: outside_time_window
+    description: It is outside the company's allowed time to start the day.
+  - code: not_started
+    description: The app stopped the start and showed the rep its own reason; error carries it.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Start my day
+    request:
+      action: start_day
+      params: {}
+      summary: Start your working day
+    result:
+      ref: "65f1a2b3c4d5e6f708192c01:0"
+      action: start_day
+      status: success
+      data:
+        started_at: "2026-01-15T07:55:00.000Z"
+  - says: ابدأ يومي
+    request:
+      action: start_day
+      params: {}
+      summary: بدء يوم العمل
+    result:
+      ref: "65f1a2b3c4d5e6f708192c02:0"
+      action: start_day
+      status: failed
+      error: Requests are still waiting to sync.
+      data:
+        code: must_sync_first
+
+maintainer_notes:
+  - The app implements this from contract 0.3.0; until then the backend must not offer it.

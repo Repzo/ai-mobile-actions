@@ -65,6 +65,13 @@ params:
       type: string
       minLength: 1
       description: A comment for the document, when the rep gives one.
+    return_reason:
+      type: string
+      minLength: 1
+      description: >-
+        Returns only (return_sales_order, return_invoice): the return reason as the rep said it,
+        for every line. The phone matches it against the company's return reasons; when it's
+        missing or matches none and a reason is needed, the card asks the rep to pick one.
 
 result:
   type: object
@@ -88,7 +95,9 @@ result:
           variant: { type: string }
           requested_qty:
             type: number
-            description: The quantity asked for, when the line was added with a different one.
+            description: >-
+              The quantity asked for, when the line went in with a different one — today only a
+              van invoice, capped at the stock left on the van.
     failed:
       type: array
       description: The lines that could not be added.
@@ -244,16 +253,3 @@ examples:
       data:
         code: visit_open_for_other_client
         client_name: Al Noor Market
-
-maintainer_notes:
-  - >-
-    A return can fail with return_reason_required (for the whole order or a line), but the
-    action has no way to pass a reason, so the assistant can never fix it. Add an optional
-    return_reason — for the document and/or per line, matched by name against the company's
-    return reasons like products — or have the card ask the rep for it.
-  - >-
-    requested_qty: read here as the quantity asked for, when the line was added with a different
-    one. Confirm, and say when that happens (rounding to the unit, stock…).
-  - >-
-    product_ambiguous as a line failure: read here as "several products matched and the rep
-    picked none". Confirm.
