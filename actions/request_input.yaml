@@ -64,8 +64,9 @@ result:
   description: >-
     The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…).
     number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD.
-    boolean: true or false — always present, even when the rep didn't touch it. Empty answers
-    are left out.
+    boolean: true or false when the rep set it (or you sent a default); left out when the rep
+    didn't touch it. Empty answers are left out. The rep can't send until every required field
+    is filled.
   additionalProperties:
     type: [string, number, boolean]
 
@@ -95,9 +96,5 @@ examples:
 
 maintainer_notes:
   - >-
-    An untouched boolean comes back as false, so "no" and "didn't answer" look the same. Leave it
-    out unless the rep set it (or honour a default), so the assistant can tell them apart.
-  - >-
     A select without options is shown as a plain text field; this contract requires options
     instead, so the assistant never sends one.
-  - Does the card refuse to submit until the required fields are filled?

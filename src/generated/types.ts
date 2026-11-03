@@ -57,6 +57,10 @@ export interface BuildOrderParams {
    * A comment for the document, when the rep gives one.
    */
   comment?: string;
+  /**
+   * Returns only (return_sales_order, return_invoice): the return reason as the rep said it, for every line. The phone matches it against the company's return reasons; when it's missing or matches none and a reason is needed, the card asks the rep to pick one.
+   */
+  return_reason?: string;
 }
 
 export interface BuildOrderResult {
@@ -78,7 +82,7 @@ export interface BuildOrderResult {
     unit?: string;
     variant?: string;
     /**
-     * The quantity asked for, when the line was added with a different one.
+     * The quantity asked for, when the line went in with a different one — today only a van invoice, capped at the stock left on the van.
      */
     requested_qty?: number;
     [k: string]: unknown;
@@ -154,6 +158,12 @@ export interface OpenActivityParams {
    * The name of a specific retail-execution template to open.
    */
   template_name?: string;
+  /**
+   * Answers to place before the screen opens (form with form_name, note, reminders) — see the description for the keys. The card previews each answer and the rep confirms; answers that match no field are shown as not placed.
+   */
+  prefill?: {
+    [k: string]: (string | number | boolean) | string[];
+  };
 }
 
 export interface OpenScreenParams {
@@ -219,7 +229,7 @@ export interface RequestInputParams {
 }
 
 /**
- * The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…). number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD. boolean: true or false — always present, even when the rep didn't touch it. Empty answers are left out.
+ * The rep's answers, keyed by each field's key (a key used twice comes back as key_2, key_3…). number: a number. text: a trimmed string. select: the chosen option. date: YYYY-MM-DD. boolean: true or false when the rep set it (or you sent a default); left out when the rep didn't touch it. Empty answers are left out. The rep can't send until every required field is filled.
  */
 export interface RequestInputResult {
   [k: string]: string | number | boolean;

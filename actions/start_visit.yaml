@@ -15,6 +15,7 @@ description: |-
   - Nearest, closest, "near me": send nearest: true. The card lists the rep's five closest
     clients by live GPS, the closest preselected.
   - client_id only when you already have it from an earlier result.
+  - No client named ("start a visit"): send nearest: true rather than asking which client.
   Never ask the rep to search for the client, and never choose between matches yourself.
   The phone then applies its own rules — the rep's day, route and visit order, geo zone and
   geofence — and may ask the rep to confirm a visit outside the client's area. The result names
@@ -74,7 +75,9 @@ errors:
   - code: busy
     description: Another visit start is already running on the phone.
   - code: not_started
-    description: The app stopped the start and showed its own reason to the rep.
+    description: >-
+      The app stopped the start and showed the rep its own reason; error carries that reason as
+      the rep saw it (in the app's language).
   - code: error
     description: Something else went wrong; error says what.
   - code: client_not_found
@@ -129,10 +132,6 @@ examples:
       status: cancelled
 
 maintainer_notes:
-  - >-
-    not_started gives the assistant nothing to work with: the reason only shows on the screen.
-    Put that reason in `error` (or split it into specific codes) so the assistant can explain it
-    and suggest a fix.
   - >-
     A request the app can't read — e.g. start_visit with no client_name, client_id or nearest —
     is dropped: the chat says it couldn't be read and the assistant is never told. Send it back
