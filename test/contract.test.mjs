@@ -9,14 +9,19 @@ import {
   ACTION_BLOCK,
   ACTION_RESULT_PREFIX,
   CONTRACT_VERSION,
+  PHONE_STATE_PREFIX,
+  PHONE_STATE_SINCE,
   catalog,
   extractActionBlock,
   formatActionBlock,
   formatActionResultMessage,
+  formatPhoneStateMessage,
   getAction,
   isActionName,
   listActions,
   parseActionResultMessage,
+  parsePhoneStateMessage,
+  sendsPhoneState,
 } from "../dist/index.js";
 
 const read = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
@@ -114,6 +119,113 @@ test("actions newer than the app's contract version are never offered to it", ()
   for (const name of added) {
     assert.ok(!offered("0.2.0").includes(name), `${name} is not offered to 0.2.0 apps`);
     assert.ok(offered("0.3.0").includes(name), `${name} is offered from 0.3.0`);
+  }
+});
+
+test("the 0.4.0 actions are offered from 0.4.0 only", () => {
+  const added = ["edit_cart", "clear_cart", "open_cart", "open_jobs", "fill_form"];
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  for (const name of added) {
+    assert.ok(!offered("0.3.0").includes(name), `${name} is not offered to 0.3.0 apps`);
+    assert.ok(offered("0.4.0").includes(name), `${name} is offered from 0.4.0`);
+    assert.equal(getAction(name, { version: "0.3.0" }), undefined);
+  }
+});
+
+test("edit_cart: every entry changes something, and a removed line takes no new quantity", () => {
+  const editCart = ajv.compile(getAction("edit_cart").params);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 3 }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", unit: "carton" }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 2, unit: "carton" }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: true }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi" }] }), false, "an entry that changes nothing");
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: true, qty: 3 }] }), false);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: false }] }), false, "remove is only ever true");
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 0 }] }), false, "qty > 0 — remove takes a line out");
+  assert.equal(editCart({ lines: [] }), false, "at least one line");
+  assert.equal(editCart({ kind: "transfer", lines: [{ product: "Pepsi", qty: 1 }] }), false);
+});
+
+test("the cart actions cover every document the cart can hold", () => {
+  const kinds = getAction("build_order").params.properties.kind.enum;
+  assert.deepEqual(catalog.phone_state.schema.properties.cart.properties.kind.enum, kinds);
+  for (const name of ["edit_cart", "clear_cart", "open_cart"]) {
+    assert.deepEqual(getAction(name).params.properties.kind.enum, kinds, name);
+  }
+  for (const name of ["edit_cart", "clear_cart"]) {
+    assert.deepEqual(getAction(name).result.properties.kind.enum, kinds, name);
+  }
+  const clearCart = ajv.compile(getAction("clear_cart").params);
+  assert.equal(clearCart({}), true);
+  assert.equal(clearCart({ kind: "return_invoice" }), true);
+});
+
+test("fill_form: a named form and at least one typed answer; the result says what was placed", () => {
+  const fillForm = ajv.compile(getAction("fill_form").params);
+  const answer = (value) => ({ form_name: "Availability survey", answers: [{ question: "Available", value }] });
+  for (const value of [true, 3, 0.35, "2026-01-15", "Sunquick Orange", ["A", "B"]]) {
+    assert.equal(fillForm(answer(value)), true, JSON.stringify(value));
+  }
+  assert.equal(fillForm(answer({ amount: 1 })), false, "answers are plain values");
+  assert.equal(fillForm(answer([])), false, "several picks means at least one");
+  assert.equal(fillForm({ form_name: "Availability survey", answers: [] }), false, "at least one answer");
+  assert.equal(fillForm({ answers: [{ question: "Available", value: true }] }), false, "the form is named");
+  assert.equal(fillForm({ form_name: "F", answers: [{ value: true }] }), false, "each answer names its question");
+
+  const action = getAction("fill_form");
+  assert.equal(action.reports_result, true);
+  const data = ajv.compile(action.result);
+  const base = { form_name: "F", client_id: "1", client_name: "A" };
+  assert.equal(data({ ...base, placed: [{ question: "Q", value: true }], not_placed: [] }), true);
+  assert.equal(data({ ...base, placed: [], not_placed: [{ question: "Q" }] }), false, "a not-placed answer says why");
+});
+
+test("open_jobs: the job list, or one job by name", () => {
+  const openJobs = ajv.compile(getAction("open_jobs").params);
+  assert.equal(openJobs({}), true);
+  assert.equal(openJobs({ job_name: "Shelf photo", job_name_variants: ["صورة الرف"] }), true);
+  assert.equal(openJobs({ job_name_variants: ["Shelf photo"] }), false, "variants only with job_name");
+  assert.equal(openJobs({ client_name: "A" }), false, "always the open visit");
+  assert.equal(getAction("open_jobs").reports_result, false);
+});
+
+test("the phone state: its schema, its example and its text form", () => {
+  const validateState = ajv.compile(catalog.phone_state.schema);
+  const example = catalog.phone_state.example;
+  assert.ok(validateState(example), ajv.errorsText(validateState.errors));
+  assert.ok(validateState({ day: { status: "not_started" }, visit: null, cart: null }), "no visit, empty cart");
+  assert.equal(validateState({ day: { status: "active" } }), false, "visit and cart are always sent");
+  assert.equal(validateState({ ...example, sync: {} }), false, "no unknown parts");
+  const job = { name: "Shelf photo", status: "waiting" };
+  assert.equal(validateState({ ...example, visit: { ...example.visit, jobs: [job] } }), false, "a job's status");
+  assert.equal(
+    validateState({ ...example, cart: { ...example.cart, kind: "transfer" } }),
+    false,
+    "the cart holds an order, invoice or return",
+  );
+
+  assert.equal(PHONE_STATE_SINCE, "0.4.0");
+  assert.equal(sendsPhoneState("0.3.0"), false);
+  assert.equal(sendsPhoneState("0.4.0"), true);
+  assert.equal(sendsPhoneState("1.0.0"), true);
+  assert.throws(() => sendsPhoneState("0.4"), TypeError);
+
+  const message = formatPhoneStateMessage(example);
+  assert.ok(message.startsWith(`${PHONE_STATE_PREFIX} {`));
+  assert.doesNotMatch(message, /\n/, "one line");
+  assert.deepEqual(parsePhoneStateMessage(message), example);
+  assert.equal(parsePhoneStateMessage(`${PHONE_STATE_PREFIX} {"day":{}}`), null, "not a state");
+  assert.equal(parsePhoneStateMessage(formatActionResultMessage({ ref: "r", action: "a", status: "cancelled" })), null);
+  assert.equal(parsePhoneStateMessage("Hello"), null);
+});
+
+test("guidance never names an action that older apps can't run", () => {
+  const since = new Map(catalog.actions.map((action) => [action.name, action.since]));
+  for (const rule of catalog.guidance) {
+    for (const [name, version] of since) {
+      if (version === "0.1.0") continue;
+      assert.ok(!new RegExp(`\\b${name}\\b`).test(rule), `guidance names ${name} (since ${version}): ${rule}`);
+    }
   }
 });
 

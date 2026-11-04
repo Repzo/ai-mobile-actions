@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "phone-state.schema.json",
+  "title": "Phone state",
+  "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.4.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["day", "visit", "cart"],
+  "properties": {
+    "day": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "description": "The rep's working day.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_started", "active", "ended"],
+          "description": "not_started: not started today. active: started and not ended. ended: ended today."
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the day started (ISO 8601)."
+        }
+      }
+    },
+    "visit": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["client_id", "client_name", "started_at", "jobs"],
+      "description": "The visit open on the phone, or null when none is open.",
+      "properties": {
+        "client_id": { "type": "string", "minLength": 1 },
+        "client_name": { "type": "string", "minLength": 1, "description": "As saved." },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the visit started (ISO 8601)."
+        },
+        "jobs": {
+          "type": "array",
+          "maxItems": 60,
+          "description": "The visit's jobs, in the order the app lists them; empty when it has none.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "status"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "description": "As the app shows it." },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "What the job is, in the app's words: form, photo, note, audit, availability, task, store_check, retail_execution, planogram…"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "true: the visit can't end until it is done (or skipped with a request)."
+              },
+              "status": {
+                "type": "string",
+                "enum": ["pending", "done", "skipped"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "cart": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "client_id", "client_name", "lines"],
+      "description": "The document being prepared in the app's cart, or null when the cart is empty.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["sales_order", "return_sales_order", "invoice", "return_invoice"]
+        },
+        "client_id": { "type": "string", "minLength": 1 },
+        "client_name": { "type": "string", "minLength": 1 },
+        "lines": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product", "qty"],
+            "properties": {
+              "product": { "type": "string", "minLength": 1, "description": "The product's name as saved." },
+              "qty": { "type": "number" },
+              "unit": { "type": "string" },
+              "variant": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

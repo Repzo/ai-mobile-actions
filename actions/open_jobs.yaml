@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: open_jobs
+title: Open the visit's jobs
+summary: >-
+  Open the jobs of the rep's open visit — the list, or one job by name — for the rep to do them.
+since: 0.4.0
+reports_result: false
+description: |-
+  Jobs are the activities set for the visit (forms, photos, audits, store checks, availability…),
+  some of them required before the visit can end — not tasks (open_screen tasks) or work orders.
+  Opens the open visit's job list, or one job when the rep names it: job_name as the rep said it,
+  plus job_name_variants, matched against the visit's jobs (the rep picks when several match).
+  There is no client to name: it is always the open visit. Use it for "take me to my jobs",
+  "start the shelf photo job". To say what is done or still pending, read the jobs in the phone
+  state; open them when the rep wants to do them.
+  The phone reports nothing back — not when the jobs open, not when it fails (a failure only shows
+  on the card) — so tell the rep what they will see, not that it is done.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    job_name:
+      type: string
+      minLength: 1
+      description: One job to open, as the rep said it. Leave it out to open the job list.
+    job_name_variants:
+      type: array
+      maxItems: 6
+      items: { type: string, minLength: 1 }
+      description: >-
+        Other spellings of job_name — jobs are often named in English when the rep speaks Arabic,
+        or the reverse: e.g. "صورة الرف" → ["Shelf photo"]. Send it whenever you send job_name.
+  dependencies:
+    job_name_variants: [job_name]
+
+# Shown on the card only — never reported back.
+errors:
+  - code: no_active_visit
+    description: No visit is open on the phone.
+  - code: no_jobs
+    description: The open visit has no jobs.
+  - code: job_not_found
+    description: No job of the visit matched job_name.
+  - code: activity_screen_open
+    description: Another activity screen is already open in the app.
+  - code: not_available
+    description: Jobs are off for the rep (module or permission).
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: Take me to my jobs
+    request:
+      action: open_jobs
+      params: {}
+      summary: Open your visit's jobs
+  - says: خليني أبدأ بمهمة صورة الرف
+    request:
+      action: open_jobs
+      params:
+        job_name: صورة الرف
+        job_name_variants: [Shelf photo, Shelf picture]
+      summary: فتح مهمة صورة الرف
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - >-
+    Asked for in testing on 2026-11-04: "What are my jobs?" and "I need to start filling the jobs
+    on this client" were answered with the Tasks screen and a question about work orders, because
+    nothing told the assistant what jobs are or where they are.
+  - >-
+    Like open_screen and open_activity, failures only show on the card. Report them as failed
+    results (successes can stay silent) so the assistant can help — e.g. after job_not_found it
+    could offer the names in the phone state.

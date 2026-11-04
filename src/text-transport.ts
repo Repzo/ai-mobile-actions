@@ -1,4 +1,5 @@
 import { CATALOG } from "./generated/catalog.js";
+import type { PhoneState } from "./generated/types.js";
 import type { ActionRequest, ActionResult, ActionStatus } from "./types.js";
 
 /** The info string of the fenced block that asks the app to run an action. */
@@ -6,6 +7,9 @@ export const ACTION_BLOCK: string = CATALOG.transport.text.request_block;
 
 /** How the app's result message starts. */
 export const ACTION_RESULT_PREFIX: string = CATALOG.transport.text.result_prefix;
+
+/** How the phone state starts when the assistant reads it as text. */
+export const PHONE_STATE_PREFIX: string = CATALOG.transport.text.state_prefix;
 
 const STATUSES: readonly ActionStatus[] = ["success", "failed", "cancelled"];
 
@@ -74,4 +78,30 @@ export function parseActionResultMessage(message: string): ActionResult | null {
     return null;
   }
   return isResult(result) ? result : null;
+}
+
+/**
+ * The phone state as the assistant reads it: one line, the prefix and the state as JSON. Check
+ * the state against `catalog.phone_state.schema` first — this only formats it.
+ */
+export function formatPhoneStateMessage(state: PhoneState): string {
+  return `${PHONE_STATE_PREFIX} ${JSON.stringify(state)}`;
+}
+
+/**
+ * The phone state read back from its text form; null when the message is not one. Only the
+ * envelope is checked (an object with `day`, `visit` and `cart`), not the schema.
+ */
+export function parsePhoneStateMessage(message: string): PhoneState | null {
+  const text = message.trimStart();
+  if (!text.startsWith(PHONE_STATE_PREFIX)) return null;
+  let state: unknown;
+  try {
+    state = JSON.parse(text.slice(PHONE_STATE_PREFIX.length));
+  } catch {
+    return null;
+  }
+  return isObject(state) && "day" in state && "visit" in state && "cart" in state
+    ? (state as unknown as PhoneState)
+    : null;
 }

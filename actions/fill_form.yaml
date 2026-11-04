@@ -1,0 +1,245 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: fill_form
+title: Fill a form
+summary: >-
+  Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to
+  review and submit.
+since: 0.4.0
+reports_result: true
+description: |-
+  Fills a form for a client with what the rep told you and opens it, filled, for the rep to
+  review and submit — the phone never submits it. Use it whenever the rep tells you what to put
+  in a form ("fill the availability survey: Sunquick available, stock is fine"), rather than
+  open_activity's prefill; to open a form with no answers, use open_activity.
+  - form_name as the rep named it, plus form_name_variants (forms are often named in English when
+    the rep speaks Arabic, or the reverse). When several forms match, the rep picks on the card.
+  - Client: during an open visit, leave it out — the visit's client is used, and naming another
+    client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;
+    the client is matched as for start_visit.
+  - answers: one per question. question: the question as the form words it when you know it,
+    else the rep's 1–4 key words, with question_variants in the other language. value answers
+    what the question asks — "stock is fine" for a "Low quantity?" question is false. Numbers as
+    numbers, yes/no as true/false, dates as YYYY-MM-DD, a list pick as the option's text (several
+    as an array), free text as text. Photos, signatures and scans stay with the rep.
+  The card shows the answers and the rep confirms. Once the form is open, the result lists the
+  answers placed and those not placed, with the form's questions when one wasn't — tell the rep
+  in a few words what is still theirs to fill.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [form_name, answers]
+  properties:
+    form_name:
+      type: string
+      minLength: 1
+      description: The form as the rep named it.
+    form_name_variants:
+      type: array
+      maxItems: 6
+      items: { type: string, minLength: 1 }
+      description: >-
+        Other spellings of form_name — the other language or script, e.g. "استبيان التوفر" →
+        ["Availability survey"].
+    client_name: { $shared: client_name }
+    client_name_variants: { $shared: client_name_variants }
+    client_id: { $shared: client_id }
+    nearest: { $shared: nearest }
+    answers:
+      type: array
+      minItems: 1
+      maxItems: 60
+      items:
+        type: object
+        additionalProperties: false
+        required: [question, value]
+        properties:
+          question:
+            type: string
+            minLength: 1
+            description: >-
+              The question as the form words it when you know it, else the rep's 1–4 key words
+              for it.
+          question_variants:
+            type: array
+            maxItems: 4
+            items: { type: string, minLength: 1 }
+            description: >-
+              The question in the other language — forms are often worded in Arabic when the rep
+              speaks English, or the reverse.
+          value:
+            description: >-
+              Numbers as numbers, yes/no as true/false, dates as YYYY-MM-DD, a list pick as the
+              option's text, several picks as an array, free text as text.
+            anyOf:
+              - type: [string, number, boolean]
+              - type: array
+                minItems: 1
+                items: { type: string, minLength: 1 }
+
+result:
+  type: object
+  required: [form_name, client_id, client_name, placed, not_placed]
+  properties:
+    form_name: { type: string, description: The form as saved. }
+    client_id: { type: string, description: The client the form is for. }
+    client_name: { type: string }
+    placed:
+      type: array
+      description: The answers placed, under the form's own questions.
+      items:
+        type: object
+        required: [question, value]
+        properties:
+          question: { type: string, description: The question as the form words it. }
+          value:
+            description: The answer as placed.
+            anyOf:
+              - type: [string, number, boolean]
+              - type: array
+                items: { type: string }
+    not_placed:
+      type: array
+      description: The answers that could not be placed.
+      items:
+        type: object
+        required: [question, code]
+        properties:
+          question: { type: string, description: The question as it was sent. }
+          code:
+            type: string
+            description: >-
+              Why: question_not_found (no question matched), question_ambiguous (several
+              matched), value_not_allowed (not one of the question's options, or not the kind of
+              value it takes), rep_only (a photo, signature or scan — the rep fills it), or error.
+    questions:
+      type: array
+      maxItems: 100
+      description: The form's questions — sent when an answer wasn't placed.
+      items:
+        type: object
+        required: [question, type]
+        properties:
+          question: { type: string, description: As the form words it. }
+          type:
+            type: string
+            description: "text, number, yes_no, date, list, media, signature…"
+          required: { type: boolean }
+          options:
+            type: array
+            maxItems: 30
+            items: { type: string }
+            description: A list question's options (the first 30).
+
+errors:
+  - code: client_required
+    description: No visit is open and no client was named.
+  - code: client_not_found
+    description: No client matched data.client_name.
+    data:
+      client_name: { type: string }
+  - code: no_location
+    description: "nearest: the phone has no GPS fix."
+  - code: no_nearby_client
+    description: "nearest: none of the rep's clients is nearby."
+  - code: visit_open_for_other_client
+    description: A visit is open at another client, data.client_name; the form can only be for it.
+    data:
+      client_name: { type: string }
+  - code: form_not_found
+    description: No form matched form_name; data.forms lists up to five of the rep's forms with the closest names.
+    data:
+      forms: { type: array, maxItems: 5, items: { type: string } }
+  - code: form_needs_sync
+    description: The form isn't on the phone yet; the app has to sync first.
+  - code: not_available
+    description: Forms are off for the rep (module or permission).
+  - code: activity_screen_open
+    description: Another activity screen is already open in the app.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Fill the availability survey for Sunquick orange — available, and stock is fine
+    request:
+      action: fill_form
+      params:
+        form_name: availability survey
+        form_name_variants: [استبيان التوفر]
+        answers:
+          - { question: Available, question_variants: [متوفر], value: true }
+          - { question: Low quantity, question_variants: [كمية قليلة], value: false }
+          - { question: Product, question_variants: [المنتج], value: Sunquick Orange }
+      summary: "Availability survey: Sunquick Orange available, stock not low"
+    result:
+      ref: "65f1a2b3c4d5e6f708192e01:0"
+      action: fill_form
+      status: success
+      data:
+        form_name: Availability Survey
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        placed:
+          - { question: Available, value: true }
+          - { question: Low Qty, value: false }
+          - { question: Product, value: Sunquick Orange 200 ml }
+        not_placed: []
+  - says: "عبّئ نموذج Shelf audit: العصير متوفر، والبلانوغرام مطبق"
+    request:
+      action: fill_form
+      params:
+        form_name: Shelf audit
+        answers:
+          - { question: العصير متوفر, question_variants: [juice available], value: true }
+          - { question: البلانوغرام, question_variants: [planogram], value: true }
+      summary: "تعبئة Shelf audit: العصير متوفر، البلانوغرام مطبق"
+    result:
+      ref: "65f1a2b3c4d5e6f708192e02:0"
+      action: fill_form
+      status: success
+      data:
+        form_name: Shelf audit
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        placed:
+          - { question: Juice available, value: true }
+        not_placed:
+          - { question: البلانوغرام, code: value_not_allowed }
+        questions:
+          - { question: Juice available, type: yes_no, required: true }
+          - { question: Planogram compliance %, type: number }
+          - { question: Shelf photo, type: media, required: true }
+  - says: Fill the price survey, Pepsi is 0.35
+    request:
+      action: fill_form
+      params:
+        form_name: price survey
+        form_name_variants: [استبيان الأسعار]
+        answers:
+          - { question: Pepsi price, question_variants: [سعر بيبسي], value: 0.35 }
+      summary: "Price survey: Pepsi 0.35"
+    result:
+      ref: "65f1a2b3c4d5e6f708192e03:0"
+      action: fill_form
+      status: failed
+      error: No form matched "price survey".
+      data:
+        code: form_not_found
+        forms: [Competitor prices, Shelf audit]
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - >-
+    Asked for in testing on 2026-11-04. open_activity's prefill guessed the questions of a form
+    with Available (yes/no), Low Qty (yes/no) and Product (a list): it sent "quantity: enough" and
+    a product name, so at most one answer could be placed, and the assistant never knew — the rep
+    then asked it to use the API instead. This action reports what was placed, takes list picks,
+    and asks the assistant to answer what the question asks.
+  - >-
+    The assistant fills best when it knows the questions before it fills. The backend can give it
+    a rep-scoped lookup of a form's questions (forms are defined on the server), as find_clients
+    does for clients; without it, the result's not_placed and questions tell the rep what is left.
+  - >-
+    App team: when the form is one of the open visit's jobs, open it as that job, so submitting it
+    ticks the job off. Does this work for classic forms (form_v1) as well? Is form_needs_sync a
+    real case?
