@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Builds the contract from actions/*.yaml and checks it on the way:
+// Builds the contract from actions/*.yaml and schemas/phone-state.schema.json, and checks it on
+// the way:
 //   catalog.json              the language-neutral catalog every client reads
 //   src/generated/catalog.ts  the same catalog as a TypeScript constant
-//   src/generated/types.ts    TypeScript types for every action's params and result
+//   src/generated/types.ts    TypeScript types for every action's params and result, and the
+//                             phone state
 //   README.md                 the action table between the `actions` markers
 // `--check` writes nothing and fails when any of them is out of date.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs";
@@ -166,8 +168,33 @@ if (!Array.isArray(base.guidance) || base.guidance.some((line) => typeof line !=
   fail("actions/_catalog.yaml: guidance must be a list of strings");
 }
 const text = base.transport?.text;
-if (!text?.request_block || !text?.result_prefix || !text?.instructions) {
-  fail("actions/_catalog.yaml: transport.text needs request_block, result_prefix and instructions");
+if (!text?.request_block || !text?.result_prefix || !text?.state_prefix || !text?.instructions) {
+  fail(
+    "actions/_catalog.yaml: transport.text needs request_block, result_prefix, state_prefix and instructions",
+  );
+}
+
+// ── phone state ─────────────────────────────────────────────────────────────
+// The schema file is the source; the catalog carries a copy without `$schema` / `$id`, so a
+// client can register both with one validator.
+const { $schema: _draft, $id: _id, ...phoneStateSchema } = readJson("schemas/phone-state.schema.json");
+const phoneStateSince = String(base.phone_state?.since ?? "");
+if (!/^\d+\.\d+\.\d+$/.test(phoneStateSince)) {
+  fail("actions/_catalog.yaml: phone_state.since must be a version like 0.4.0");
+} else if (compareVersions(phoneStateSince, pkg.version) > 0) {
+  fail(`actions/_catalog.yaml: phone_state.since ${phoneStateSince} is newer than the package version ${pkg.version}`);
+}
+try {
+  const validateState = ajv.compile(phoneStateSchema);
+  if (!base.phone_state?.example) {
+    fail("actions/_catalog.yaml: phone_state needs an example");
+  } else if (!validateState(base.phone_state.example)) {
+    fail(
+      `actions/_catalog.yaml phone_state.example: ${ajv.errorsText(validateState.errors, { dataVar: "state" })}`,
+    );
+  }
+} catch (error) {
+  fail(`schemas/phone-state.schema.json: ${error.message}`);
 }
 
 if (failures) {
@@ -179,6 +206,11 @@ const catalog = {
   name: pkg.name,
   version: pkg.version,
   guidance: base.guidance,
+  phone_state: {
+    since: phoneStateSince,
+    schema: phoneStateSchema,
+    example: base.phone_state.example,
+  },
   transport: base.transport,
   actions,
 };
@@ -230,12 +262,18 @@ for (const action of actions) {
     );
   }
 }
+// The title would name the type; the name is given here instead.
+const { title: _title, ...phoneStateForTypes } = phoneStateSchema;
+const phoneStateTs = await compile(forTypes(phoneStateForTypes), "PhoneState", TS_OPTIONS);
+
 const typesTs = [
   `// ${GENERATED_NOTE}`,
   "",
   `export type ActionName = ${actions.map((action) => JSON.stringify(action.name)).join(" | ")};`,
   "",
   ...typeChunks.map((chunk) => chunk.trim() + "\n"),
+  "/** What the app sends with every chat request from contract `phone_state.since` on. */",
+  phoneStateTs.trim() + "\n",
   "/** Each action's `params`. */",
   "export interface ActionParams {",
   ...actions.map((action) => `  ${action.name}: ${pascal(action.name)}Params;`),

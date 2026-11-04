@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: open_cart
+title: Open the cart
+summary: >-
+  Open the order, invoice or return being prepared in the app's cart, for the rep to review and
+  submit.
+since: 0.4.0
+reports_result: false
+description: |-
+  Opens the app's cart — the document being prepared: a sales order, return sales order, invoice
+  or return invoice — so the rep can review, change and submit it. Use it for "open my cart",
+  "show me the order", "take me back to the invoice". To change or remove lines use edit_cart; to
+  add products, build_order. kind only when the rep names the document: the phone checks the cart
+  holds it.
+  The phone reports nothing back — not when the cart opens, not when it fails (a failure only
+  shows on the card) — so tell the rep what they will see, not that it is done.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: Only when the rep names the document; the phone checks the cart holds it.
+
+# Shown on the card only — never reported back.
+errors:
+  - code: cart_empty
+    description: The cart is empty — nothing is being prepared.
+  - code: kind_mismatch
+    description: The cart holds another document.
+  - code: sales_screen_open
+    description: A sales screen is already open in the app.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: Open my cart
+    request:
+      action: open_cart
+      params: {}
+      summary: Open your cart
+  - says: رجعني على فاتورة الإرجاع
+    request:
+      action: open_cart
+      params: { kind: return_invoice }
+      summary: فتح فاتورة الإرجاع في السلة
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - >-
+    Like open_screen and open_activity, failures only show on the card. Report them as failed
+    results (successes can stay silent) so the assistant can help.

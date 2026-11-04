@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: clear_cart
+title: Empty the cart
+summary: >-
+  Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms.
+since: 0.4.0
+reports_result: true
+description: |-
+  Empties the app's cart: every line of the document being prepared — a sales order, return sales
+  order, invoice or return invoice — is removed and the draft is dropped. Nothing already
+  submitted is touched. Use it only when the rep asks to empty, clear or cancel the cart or start
+  it over ("delete the whole cart", "cancel this order") — never on your own, not even to get
+  past a mixed_cart failure (suggest it instead). To remove some lines, use edit_cart.
+  kind only when the rep names the document: the phone checks the cart holds it.
+  The result says how many lines were removed, or why the cart couldn't be emptied.
+
+params:
+  type: object
+  additionalProperties: false
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: Only when the rep names the document; the phone checks the cart holds it.
+
+result:
+  type: object
+  required: [kind, client_id, client_name, lines_removed]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: The document that was dropped.
+    client_id: { type: string, description: The client it was for. }
+    client_name: { type: string }
+    lines_removed: { type: integer, minimum: 0 }
+
+errors:
+  - code: cart_empty
+    description: The cart is already empty.
+  - code: kind_mismatch
+    description: The cart holds another document, data.kind.
+    data:
+      kind: { type: string, enum: [sales_order, return_sales_order, invoice, return_invoice] }
+  - code: not_available
+    description: Emptying the cart is off for the rep (module or permission).
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: احذف السلة كلها
+    request:
+      action: clear_cart
+      params: {}
+      summary: تفريغ السلة بالكامل
+    result:
+      ref: "65f1a2b3c4d5e6f708192d11:0"
+      action: clear_cart
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        lines_removed: 2
+  - says: Cancel the return
+    request:
+      action: clear_cart
+      params: { kind: return_invoice }
+      summary: Empty the cart (return invoice)
+    result:
+      ref: "65f1a2b3c4d5e6f708192d12:0"
+      action: clear_cart
+      status: failed
+      error: The cart is already empty.
+      data:
+        code: cart_empty
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
