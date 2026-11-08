@@ -117,6 +117,15 @@ test("actions newer than the app's contract version are never offered to it", ()
   }
 });
 
+test("the jobs actions arrive with 0.4.0 and take no parameters", () => {
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  for (const name of ["get_jobs", "open_jobs"]) {
+    assert.ok(!offered("0.3.0").includes(name), `${name} is not offered to 0.3.0 apps`);
+    assert.ok(offered("0.4.0").includes(name), `${name} is offered from 0.4.0`);
+    assert.equal(ajv.compile(getAction(name).params)({ client_name: "A" }), false, `${name} reads the open visit`);
+  }
+});
+
 test("the short list carries one line per action, filtered by the app's contract version", () => {
   const all = listActions();
   assert.equal(all.length, catalog.actions.length);
