@@ -42,6 +42,7 @@ definition only when it needs it.
 | [`end_day`](actions/end_day.yaml) | End the rep's working day, with the app's own end-of-day checks. | yes | 0.3.0 |
 | [`end_visit`](actions/end_visit.yaml) | End the rep's open visit, through the app's own end-of-visit checks. | yes | 0.3.0 |
 | [`fill_form`](actions/fill_form.yaml) | Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to review and submit. | yes | 0.5.0 |
+| [`fill_retail_execution`](actions/fill_retail_execution.yaml) | Fill one item (usually a product) of a retail execution template with the answers the rep gives, and open it filled for the rep to review and save. | yes | 0.6.0 |
 | [`get_cart`](actions/get_cart.yaml) | Read the order, invoice or return being prepared in the app's cart, line by line — the phone answers at once, without asking the rep. | yes | 0.5.0 |
 | [`get_jobs`](actions/get_jobs.yaml) | Read the open visit's jobs (its checklist) and which are still pending — the phone answers at once, without asking the rep. | yes | 0.4.0 |
 | [`navigate_to_client`](actions/navigate_to_client.yaml) | Open turn-by-turn directions to one of the rep's clients in the phone's maps app. | no | 0.3.0 |

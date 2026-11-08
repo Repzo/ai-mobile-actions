@@ -17,7 +17,8 @@ guidance:
     Pick the action by what the rep wants, from the actions you have — for example: an order,
     invoice or return with products → build_order; the cart being prepared → get_cart to read
     it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with
-    the rep's answers → fill_form; opening one of the app's own activities for a client (a form,
+    the rep's answers → fill_form; filling a retail execution template for one of its items (a
+    product) → fill_retail_execution; opening one of the app's own activities for a client (a form,
     a note, a photo, collection…) → open_activity; information to record or report (prices,
     quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs
     (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them;

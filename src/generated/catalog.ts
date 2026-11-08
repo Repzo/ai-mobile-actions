@@ -3,11 +3,11 @@ import type { MobileActionsCatalog } from "../types.js";
 
 export const CATALOG: MobileActionsCatalog = {
   "name": "repzo-ai-mobile-actions",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "guidance": [
     "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves. When the rep asks you to use the API instead, don't: reply in one short sentence, with no reasons, and offer the action.",
     "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs and get_cart, which only read the phone and answer at once.",
-    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; the cart being prepared → get_cart to read it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with the rep's answers → fill_form; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
+    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; the cart being prepared → get_cart to read it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with the rep's answers → fill_form; filling a retail execution template for one of its items (a product) → fill_retail_execution; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
     "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
     "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
     "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
@@ -2206,6 +2206,440 @@ export const CATALOG: MobileActionsCatalog = {
               "forms": [
                 "Competitor prices",
                 "Shelf audit"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "fill_retail_execution",
+      "title": "Fill a retail execution item",
+      "summary": "Fill one item (usually a product) of a retail execution template with the answers the rep gives, and open it filled for the rep to review and save.",
+      "description": "Fills one item of a retail execution template for a client — the template's fields for one of\nits items, usually a product (\"arm test for Compressor ADD9: available, price 12, facing yes\")\n— and opens that item filled for the rep to review and save; the rep then submits the template\nas usual. The answers go into the item's draft: nothing is saved or submitted until the rep does\nit. To open a template with no answers, use open_activity.\n- template_name as the rep named it, plus template_name_variants. When several templates\n  match, the rep picks on the card.\n- source: the item to fill as the rep named it (a product, brand or category, as the template\n  lists them), plus source_variants (other-script spellings). When several items match, the\n  rep picks on the card. Templates hold many items: when the rep didn't name one, ask which.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest.\n  Retail execution needs an open visit: the card offers \"Start visit & fill\", so any\n  start_visit failure can come back too.\n- answers: as for fill_form — question as the template words it when you know it, else the\n  rep's 1–4 key words, with question_variants in the other language; value answers what the\n  question asks. Yes/no as true/false, numbers as numbers, dates as YYYY-MM-DD, a list pick as\n  the option's text (several as an array), free text as text. Photos and barcode scans stay\n  with the rep.\nOnce the item is open, the result lists the answers placed and those not placed, with the\ntemplate's questions when one wasn't — tell the rep in a few words what is still theirs to\nfill.",
+      "since": "0.6.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_name",
+          "source",
+          "answers"
+        ],
+        "properties": {
+          "template_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template as the rep named it."
+          },
+          "template_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of template_name — the other language or script."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item to fill (usually a product) as the rep named it."
+          },
+          "source_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of source — products are often saved in English when the rep speaks Arabic, or the reverse."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          },
+          "answers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 60,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "question",
+                "value"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The question as the template words it when you know it, else the rep's 1–4 key words for it."
+                },
+                "question_variants": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The question in the other language."
+                },
+                "value": {
+                  "description": "Yes/no as true/false, numbers as numbers, dates as YYYY-MM-DD, a list pick as the option's text, several picks as an array, free text as text.",
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "template_name",
+          "source_name",
+          "client_id",
+          "client_name",
+          "placed",
+          "not_placed"
+        ],
+        "properties": {
+          "template_name": {
+            "type": "string",
+            "description": "The template as saved."
+          },
+          "source_name": {
+            "type": "string",
+            "description": "The item filled, as saved."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client it is for."
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "placed": {
+            "type": "array",
+            "description": "The answers placed, under the template's own questions.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "value"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "The question as the template words it."
+                },
+                "value": {
+                  "description": "The answer as placed.",
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "not_placed": {
+            "type": "array",
+            "description": "The answers that could not be placed.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "code"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "The question as it was sent."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Why: question_not_found (no question matched), question_ambiguous (several matched), value_not_allowed (not one of the question's options, or not the kind of value it takes), rep_only (a photo, a barcode scan or a read-only field — the rep handles it), or error."
+                }
+              }
+            }
+          },
+          "questions": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "The template's questions — sent when an answer wasn't placed.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "type"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "As the template words it."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "text, number, yes_no, date, list, media, scan"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A list question's options (the first 30)."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
+        },
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client, data.client_name; the template can only be for it.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "visit_required",
+          "description": "Retail execution needs an open visit at the client — start one first."
+        },
+        {
+          "code": "template_not_found",
+          "description": "No template matched template_name; data.templates lists up to five of the rep's templates with the closest names.",
+          "data": {
+            "templates": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "template_needs_sync",
+          "description": "The template has to be re-synced in the app before it can open."
+        },
+        {
+          "code": "source_not_found",
+          "description": "The template has no item matching source; data.sources lists up to five of its items with the closest names.",
+          "data": {
+            "sources": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "not_available",
+          "description": "Retail execution is off for the rep (module or permission), or the client is off route."
+        },
+        {
+          "code": "activity_screen_open",
+          "description": "A retail execution screen is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Arm test for Compressor ADD9: it's available, price 12",
+          "request": {
+            "action": "fill_retail_execution",
+            "params": {
+              "template_name": "arm test",
+              "source": "Compressor ADD9",
+              "answers": [
+                {
+                  "question": "Available",
+                  "question_variants": [
+                    "متوفر"
+                  ],
+                  "value": true
+                },
+                {
+                  "question": "Price",
+                  "question_variants": [
+                    "السعر"
+                  ],
+                  "value": 12
+                }
+              ]
+            },
+            "summary": "Arm test, Compressor ADD9: available, price 12"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192f01:0",
+            "action": "fill_retail_execution",
+            "status": "success",
+            "data": {
+              "template_name": "Arm Test",
+              "source_name": "Compressor ADD9",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "placed": [
+                {
+                  "question": "Available",
+                  "value": true
+                },
+                {
+                  "question": "Shelf price",
+                  "value": 12
+                }
+              ],
+              "not_placed": []
+            }
+          }
+        },
+        {
+          "says": "عبّي شيلف تشيك لعصير برتقال، الكمية ٢٠ وفي صورة",
+          "request": {
+            "action": "fill_retail_execution",
+            "params": {
+              "template_name": "شيلف تشيك",
+              "template_name_variants": [
+                "Shelf check"
+              ],
+              "source": "عصير برتقال",
+              "source_variants": [
+                "Orange Juice"
+              ],
+              "answers": [
+                {
+                  "question": "الكمية",
+                  "question_variants": [
+                    "Quantity"
+                  ],
+                  "value": 20
+                },
+                {
+                  "question": "صورة",
+                  "question_variants": [
+                    "Photo"
+                  ],
+                  "value": "yes"
+                }
+              ]
+            },
+            "summary": "Shelf check، عصير برتقال: الكمية ٢٠"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192f02:0",
+            "action": "fill_retail_execution",
+            "status": "success",
+            "data": {
+              "template_name": "Shelf check",
+              "source_name": "Orange Juice 1L",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "placed": [
+                {
+                  "question": "Quantity",
+                  "value": 20
+                }
+              ],
+              "not_placed": [
+                {
+                  "question": "صورة",
+                  "code": "rep_only"
+                }
+              ],
+              "questions": [
+                {
+                  "question": "Quantity",
+                  "type": "number",
+                  "required": true
+                },
+                {
+                  "question": "Shelf photo",
+                  "type": "media",
+                  "required": true
+                }
               ]
             }
           }
