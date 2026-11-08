@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: get_jobs
+title: Read the visit's jobs
+summary: >-
+  Read the open visit's jobs (its checklist) and which are still pending — the phone answers at
+  once, without asking the rep.
+since: 0.4.0
+reports_result: true
+description: |-
+  Reads the jobs of the rep's open visit — the checklist the company assigns for it (forms,
+  photos, audits, retail execution…) — and whether each is done, skipped or still pending. It
+  only reads, so the phone answers at once: no card, nothing for the rep to confirm.
+  Use it for "what jobs do I have?", "what's left in this visit?", "can I end the visit?". Jobs
+  with blocks_end_visit must be done before the visit can end. To take the rep to the list, use
+  open_jobs.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [client_id, client_name, pending, blocking, jobs]
+  properties:
+    client_id: { type: string }
+    client_name: { type: string, description: The visit's client. }
+    pending: { type: integer, minimum: 0, description: Jobs still pending. }
+    blocking: { type: integer, minimum: 0, description: Pending jobs that keep the visit from ending. }
+    jobs:
+      type: array
+      description: Every job of the visit, in the order the app lists them.
+      items:
+        type: object
+        required: [id, category, type, status, blocks_end_visit]
+        properties:
+          id: { type: string }
+          category: { type: string, description: The job category's name. }
+          type:
+            type: string
+            enum:
+              - before_after
+              - photo
+              - note
+              - form
+              - form_v2
+              - audit
+              - availability
+              - shelf_share
+              - secondary_display
+              - checkout_display
+              - item_status
+              - retail_execution
+              - other
+            description: What the rep does for the job.
+          description: { type: string, description: "The job's own instructions, when it has any." }
+          status: { type: string, enum: [pending, done, skipped] }
+          blocks_end_visit:
+            type: boolean
+            description: Still pending, and must be done before the visit can end.
+
+errors:
+  - code: no_active_visit
+    description: No visit is open, so there are no jobs to read.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: What's left in this visit?
+    request:
+      action: get_jobs
+      params: {}
+      summary: Read this visit's jobs
+    result:
+      ref: "65f1a2b3c4d5e6f708193301:0"
+      action: get_jobs
+      status: success
+      data:
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        pending: 2
+        blocking: 1
+        jobs:
+          - id: 65f1a2b3c4d5e6f708193a01
+            category: Weekly checks
+            type: form
+            description: Shelf condition survey
+            status: done
+            blocks_end_visit: false
+          - id: 65f1a2b3c4d5e6f708193a02
+            category: Weekly checks
+            type: photo
+            description: Photo of the promo stand
+            status: pending
+            blocks_end_visit: true
+          - id: 65f1a2b3c4d5e6f708193a03
+            category: Weekly checks
+            type: availability
+            status: pending
+            blocks_end_visit: false
+  - says: شو المهام اللي باقية علي؟
+    request:
+      action: get_jobs
+      params: {}
+      summary: قراءة مهام الزيارة
+    result:
+      ref: "65f1a2b3c4d5e6f708193302:0"
+      action: get_jobs
+      status: failed
+      error: No visit is open.
+      data:
+        code: no_active_visit
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - >-
+    The first read-only action: the app runs it as soon as it arrives and sends the result
+    without a confirmation card. Jobs live on the phone (offline) until the visit syncs, so the
+    server can't read them reliably.

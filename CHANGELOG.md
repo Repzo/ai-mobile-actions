@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-11-08
+
+Two new actions for the visit's jobs (its checklist), both `since: 0.4.0`.
+
+- `get_jobs`: reads the open visit's jobs — done, skipped or pending, and which keep the visit
+  from ending. The first read-only action: the phone answers at once, with no card to confirm.
+- `open_jobs`: opens the open visit's Jobs tab.
+
 ## 0.3.0 — 2026-11-03
 
 Twelve new actions, all `since: 0.3.0` — offered only to app builds that implement them.

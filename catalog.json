@@ -1,10 +1,10 @@
 {
   "name": "repzo-ai-mobile-actions",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "guidance": [
     "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves.",
-    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there.",
-    "Pick the action by what the rep wants: an order, invoice or return with products → build_order; one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs, which only reads the phone and answers at once.",
+    "Pick the action by what the rep wants: an order, invoice or return with products → build_order; one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
     "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
     "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
     "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
@@ -1237,6 +1237,179 @@
       ]
     },
     {
+      "name": "get_jobs",
+      "title": "Read the visit's jobs",
+      "summary": "Read the open visit's jobs (its checklist) and which are still pending — the phone answers at once, without asking the rep.",
+      "description": "Reads the jobs of the rep's open visit — the checklist the company assigns for it (forms,\nphotos, audits, retail execution…) — and whether each is done, skipped or still pending. It\nonly reads, so the phone answers at once: no card, nothing for the rep to confirm.\nUse it for \"what jobs do I have?\", \"what's left in this visit?\", \"can I end the visit?\". Jobs\nwith blocks_end_visit must be done before the visit can end. To take the rep to the list, use\nopen_jobs.",
+      "since": "0.4.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name",
+          "pending",
+          "blocking",
+          "jobs"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The visit's client."
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Jobs still pending."
+          },
+          "blocking": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pending jobs that keep the visit from ending."
+          },
+          "jobs": {
+            "type": "array",
+            "description": "Every job of the visit, in the order the app lists them.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "category",
+                "type",
+                "status",
+                "blocks_end_visit"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The job category's name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "before_after",
+                    "photo",
+                    "note",
+                    "form",
+                    "form_v2",
+                    "audit",
+                    "availability",
+                    "shelf_share",
+                    "secondary_display",
+                    "checkout_display",
+                    "item_status",
+                    "retail_execution",
+                    "other"
+                  ],
+                  "description": "What the rep does for the job."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The job's own instructions, when it has any."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "done",
+                    "skipped"
+                  ]
+                },
+                "blocks_end_visit": {
+                  "type": "boolean",
+                  "description": "Still pending, and must be done before the visit can end."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "no_active_visit",
+          "description": "No visit is open, so there are no jobs to read."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "What's left in this visit?",
+          "request": {
+            "action": "get_jobs",
+            "params": {},
+            "summary": "Read this visit's jobs"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193301:0",
+            "action": "get_jobs",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "pending": 2,
+              "blocking": 1,
+              "jobs": [
+                {
+                  "id": "65f1a2b3c4d5e6f708193a01",
+                  "category": "Weekly checks",
+                  "type": "form",
+                  "description": "Shelf condition survey",
+                  "status": "done",
+                  "blocks_end_visit": false
+                },
+                {
+                  "id": "65f1a2b3c4d5e6f708193a02",
+                  "category": "Weekly checks",
+                  "type": "photo",
+                  "description": "Photo of the promo stand",
+                  "status": "pending",
+                  "blocks_end_visit": true
+                },
+                {
+                  "id": "65f1a2b3c4d5e6f708193a03",
+                  "category": "Weekly checks",
+                  "type": "availability",
+                  "status": "pending",
+                  "blocks_end_visit": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "شو المهام اللي باقية علي؟",
+          "request": {
+            "action": "get_jobs",
+            "params": {},
+            "summary": "قراءة مهام الزيارة"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193302:0",
+            "action": "get_jobs",
+            "status": "failed",
+            "error": "No visit is open.",
+            "data": {
+              "code": "no_active_visit"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "navigate_to_client",
       "title": "Directions to a client",
       "summary": "Open turn-by-turn directions to one of the rep's clients in the phone's maps app.",
@@ -1550,6 +1723,47 @@
               }
             },
             "summary": "New reminder for Al Noor Market"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_jobs",
+      "title": "Open the visit's jobs",
+      "summary": "Open the Jobs tab of the rep's open visit, where they work through the visit's checklist.",
+      "description": "Opens the Jobs tab of the open visit's client screen — the checklist of forms, photos,\naudits… the company assigned — where the rep taps a job to do it. A floating \"back to\nassistant\" button brings the rep back to the chat. It needs an open visit (start_visit\nfirst). An empty list means the visit has no jobs yet; the tab refreshes them. To tell the rep\nwhat is pending, use get_jobs instead.\nThe phone reports nothing back — not when the tab opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
+      "since": "0.4.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "errors": [
+        {
+          "code": "no_active_visit",
+          "description": "No visit is open."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Show me my jobs",
+          "request": {
+            "action": "open_jobs",
+            "params": {},
+            "summary": "Open this visit's jobs"
+          }
+        },
+        {
+          "says": "افتح المهام",
+          "request": {
+            "action": "open_jobs",
+            "params": {},
+            "summary": "فتح مهام الزيارة"
           }
         }
       ]

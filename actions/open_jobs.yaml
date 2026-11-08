@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: open_jobs
+title: Open the visit's jobs
+summary: Open the Jobs tab of the rep's open visit, where they work through the visit's checklist.
+since: 0.4.0
+reports_result: false
+description: |-
+  Opens the Jobs tab of the open visit's client screen — the checklist of forms, photos,
+  audits… the company assigned — where the rep taps a job to do it. A floating "back to
+  assistant" button brings the rep back to the chat. It needs an open visit (start_visit
+  first). An empty list means the visit has no jobs yet; the tab refreshes them. To tell the rep
+  what is pending, use get_jobs instead.
+  The phone reports nothing back — not when the tab opens, not when it fails (a failure only
+  shows on the card) — so tell the rep what they will see, not that it is done.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+# Shown on the card only — never reported back.
+errors:
+  - code: no_active_visit
+    description: No visit is open.
+  - code: error
+    description: Something else went wrong.
+
+examples:
+  - says: Show me my jobs
+    request:
+      action: open_jobs
+      params: {}
+      summary: Open this visit's jobs
+  - says: افتح المهام
+    request:
+      action: open_jobs
+      params: {}
+      summary: فتح مهام الزيارة
+
+maintainer_notes:
+  - The app implements this from contract 0.4.0; until then the backend must not offer it.
