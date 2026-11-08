@@ -122,13 +122,13 @@ test("actions newer than the app's contract version are never offered to it", ()
   }
 });
 
-test("the 0.4.0 actions are offered from 0.4.0 only", () => {
-  const added = ["edit_cart", "clear_cart", "open_cart", "open_jobs", "fill_form"];
+test("the 0.5.0 actions are offered from 0.5.0 only", () => {
+  const added = ["edit_cart", "clear_cart", "open_cart", "fill_form"];
   const offered = (version) => listActions({ version }).map((action) => action.name);
   for (const name of added) {
-    assert.ok(!offered("0.3.0").includes(name), `${name} is not offered to 0.3.0 apps`);
-    assert.ok(offered("0.4.0").includes(name), `${name} is offered from 0.4.0`);
-    assert.equal(getAction(name, { version: "0.3.0" }), undefined);
+    assert.ok(!offered("0.4.0").includes(name), `${name} is not offered to 0.4.0 apps`);
+    assert.ok(offered("0.5.0").includes(name), `${name} is offered from 0.5.0`);
+    assert.equal(getAction(name, { version: "0.4.0" }), undefined);
   }
 });
 
@@ -180,15 +180,6 @@ test("fill_form: a named form and at least one typed answer; the result says wha
   assert.equal(data({ ...base, placed: [], not_placed: [{ question: "Q" }] }), false, "a not-placed answer says why");
 });
 
-test("open_jobs: the job list, or one job by name", () => {
-  const openJobs = ajv.compile(getAction("open_jobs").params);
-  assert.equal(openJobs({}), true);
-  assert.equal(openJobs({ job_name: "Shelf photo", job_name_variants: ["صورة الرف"] }), true);
-  assert.equal(openJobs({ job_name_variants: ["Shelf photo"] }), false, "variants only with job_name");
-  assert.equal(openJobs({ client_name: "A" }), false, "always the open visit");
-  assert.equal(getAction("open_jobs").reports_result, false);
-});
-
 test("the phone state: its schema, its example and its text form", () => {
   const validateState = ajv.compile(catalog.phone_state.schema);
   const example = catalog.phone_state.example;
@@ -204,9 +195,9 @@ test("the phone state: its schema, its example and its text form", () => {
     "the cart holds an order, invoice or return",
   );
 
-  assert.equal(PHONE_STATE_SINCE, "0.4.0");
-  assert.equal(sendsPhoneState("0.3.0"), false);
-  assert.equal(sendsPhoneState("0.4.0"), true);
+  assert.equal(PHONE_STATE_SINCE, "0.5.0");
+  assert.equal(sendsPhoneState("0.4.0"), false);
+  assert.equal(sendsPhoneState("0.5.0"), true);
   assert.equal(sendsPhoneState("1.0.0"), true);
   assert.throws(() => sendsPhoneState("0.4"), TypeError);
 
@@ -219,13 +210,21 @@ test("the phone state: its schema, its example and its text form", () => {
   assert.equal(parsePhoneStateMessage("Hello"), null);
 });
 
-test("guidance never names an action that older apps can't run", () => {
-  const since = new Map(catalog.actions.map((action) => [action.name, action.since]));
+test("every action the guidance names is one of the catalog's actions", () => {
+  const names = new Set(catalog.actions.map((action) => action.name));
   for (const rule of catalog.guidance) {
-    for (const [name, version] of since) {
-      if (version === "0.1.0") continue;
-      assert.ok(!new RegExp(`\\b${name}\\b`).test(rule), `guidance names ${name} (since ${version}): ${rule}`);
+    for (const [word] of rule.matchAll(/\b[a-z]+(?:_[a-z]+)+\b/g)) {
+      assert.ok(names.has(word), `guidance names ${word}, which is not an action: ${rule}`);
     }
+  }
+});
+
+test("the jobs actions arrive with 0.4.0 and take no parameters", () => {
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  for (const name of ["get_jobs", "open_jobs"]) {
+    assert.ok(!offered("0.3.0").includes(name), `${name} is not offered to 0.3.0 apps`);
+    assert.ok(offered("0.4.0").includes(name), `${name} is offered from 0.4.0`);
+    assert.equal(ajv.compile(getAction(name).params)({ client_name: "A" }), false, `${name} reads the open visit`);
   }
 });
 

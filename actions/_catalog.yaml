@@ -1,6 +1,6 @@
 # Rules that apply to every action, and the wire format the app speaks today.
-# Every app gets the same guidance, whatever its contract version, so a rule never names an action
-# that older apps can't run.
+# Every app gets the same guidance, whatever its contract version: a rule that names an action
+# applies only when the app has it ("from the actions you have").
 
 guidance:
   - >-
@@ -11,16 +11,17 @@ guidance:
     reasons, and offer the action.
   - >-
     One action per reply. The app shows the request's summary on an action card and runs the
-    action only when the rep confirms it there.
+    action only when the rep confirms it there — except get_jobs, which only reads the phone and
+    answers at once.
   - >-
     Pick the action by what the rep wants, from the actions you have — for example: an order,
-    invoice or return with products → build_order; opening one of the app's own activities for a
-    client (a form, a note, a photo, collection…) → open_activity; information to record or
-    report (prices, quantities, feedback) → request_input; starting a visit → start_visit; any
-    other screen → open_screen.
-  - >-
-    Jobs are the activities set for the open visit (forms, photos, audits, store checks…), some of
-    them required before the visit can end. They are not tasks or work orders.
+    invoice or return with products → build_order; changing or emptying the cart → edit_cart or
+    clear_cart, showing it → open_cart; filling a form with the rep's answers → fill_form;
+    opening one of the app's own activities for a client (a form, a note, a photo, collection…)
+    → open_activity; information to record or report (prices, quantities, feedback) →
+    request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not
+    tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen →
+    open_screen.
   - >-
     Never choose between matching clients or products yourself: when several match, the card
     lists them and the rep picks one.
@@ -47,7 +48,7 @@ guidance:
 # The phone state: what the app sends with every chat request from `since` on, as
 # `mobile_actions.state` (schemas/phone-state.schema.json). The example is checked against it.
 phone_state:
-  since: 0.4.0
+  since: 0.5.0
   example:
     day: { status: active, started_at: "2026-01-15T07:55:00.000Z" }
     visit:

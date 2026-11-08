@@ -4,7 +4,7 @@ title: Open the cart
 summary: >-
   Open the order, invoice or return being prepared in the app's cart, for the rep to review and
   submit.
-since: 0.4.0
+since: 0.5.0
 reports_result: false
 description: |-
   Opens the app's cart — the document being prepared: a sales order, return sales order, invoice
@@ -48,7 +48,7 @@ examples:
       summary: فتح فاتورة الإرجاع في السلة
 
 maintainer_notes:
-  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.
   - >-
     Like open_screen and open_activity, failures only show on the card. Report them as failed
     results (successes can stay silent) so the assistant can help.

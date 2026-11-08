@@ -4,7 +4,7 @@ title: Fill a form
 summary: >-
   Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to
   review and submit.
-since: 0.4.0
+since: 0.5.0
 reports_result: true
 description: |-
   Fills a form for a client with what the rep told you and opens it, filled, for the rep to
@@ -228,7 +228,7 @@ examples:
         forms: [Competitor prices, Shelf audit]
 
 maintainer_notes:
-  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.
   - >-
     Asked for in testing on 2026-11-04. open_activity's prefill guessed the questions of a form
     with Available (yes/no), Low Qty (yes/no) and Product (a list): it sent "quantity: enough" and

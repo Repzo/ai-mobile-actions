@@ -1,11 +1,10 @@
 {
   "name": "repzo-ai-mobile-actions",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "guidance": [
     "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves. When the rep asks you to use the API instead, don't: reply in one short sentence, with no reasons, and offer the action.",
-    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there.",
-    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; any other screen → open_screen.",
-    "Jobs are the activities set for the open visit (forms, photos, audits, store checks…), some of them required before the visit can end. They are not tasks or work orders.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs, which only reads the phone and answers at once.",
+    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; changing or emptying the cart → edit_cart or clear_cart, showing it → open_cart; filling a form with the rep's answers → fill_form; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
     "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
     "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
     "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
@@ -14,10 +13,10 @@
     "Replies are read on a phone: keep them short."
   ],
   "phone_state": {
-    "since": "0.4.0",
+    "since": "0.5.0",
     "schema": {
       "title": "Phone state",
-      "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.4.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
+      "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.5.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1131,7 +1130,7 @@
       "title": "Empty the cart",
       "summary": "Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms.",
       "description": "Empties the app's cart: every line of the document being prepared — a sales order, return sales\norder, invoice or return invoice — is removed and the draft is dropped. Nothing already\nsubmitted is touched. Use it only when the rep asks to empty, clear or cancel the cart or start\nit over (\"delete the whole cart\", \"cancel this order\") — never on your own, not even to get\npast a mixed_cart failure (suggest it instead). To remove some lines, use edit_cart.\nkind only when the rep names the document: the phone checks the cart holds it.\nThe result says how many lines were removed, or why the cart couldn't be emptied.",
-      "since": "0.4.0",
+      "since": "0.5.0",
       "reports_result": true,
       "params": {
         "type": "object",
@@ -1361,7 +1360,7 @@
       "title": "Change the cart's lines",
       "summary": "Change quantities or units of lines in the order, invoice or return being prepared in the app's cart, or remove lines — for the rep to review and submit.",
       "description": "Changes the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice, whichever it holds — and opens the cart for the rep to review and\nsubmit (it never submits anything itself). Use it when the rep changes lines already in the\ncart: \"make it 3\", \"change the Pepsi to cartons\", \"remove the coffee\", \"3 of each\". To add\nproducts use build_order; to empty the whole cart, clear_cart.\n- lines: one entry per line to change, named as the rep said it or as the cart shows it, plus\n  product_variants. The phone matches them against the cart's lines only, never the whole\n  catalog; when several lines match (one product in two units or variants), the rep picks on\n  the card. For \"each line\" or \"all of them\", list every line of the phone state's cart (or of\n  the last build_order result).\n- qty is the line's new quantity, not a difference: \"2 more\" on a line of 3 is qty 5. unit only\n  when the rep names a new one, in English (\"carton\", \"box\", \"piece\"). remove: true takes the\n  line out.\n- kind only when the rep names the document (\"the return\"): the phone checks the cart holds it.\nThe action succeeds when at least one line changed: the result lists the lines changed, removed\nand failed — summarize them briefly. It fails as a whole when the cart is empty or no line could\nbe changed.",
-      "since": "0.4.0",
+      "since": "0.5.0",
       "reports_result": true,
       "params": {
         "type": "object",
@@ -1993,7 +1992,7 @@
       "title": "Fill a form",
       "summary": "Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to review and submit.",
       "description": "Fills a form for a client with what the rep told you and opens it, filled, for the rep to\nreview and submit — the phone never submits it. Use it whenever the rep tells you what to put\nin a form (\"fill the availability survey: Sunquick available, stock is fine\"), rather than\nopen_activity's prefill; to open a form with no answers, use open_activity.\n- form_name as the rep named it, plus form_name_variants (forms are often named in English when\n  the rep speaks Arabic, or the reverse). When several forms match, the rep picks on the card.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;\n  the client is matched as for start_visit.\n- answers: one per question. question: the question as the form words it when you know it,\n  else the rep's 1–4 key words, with question_variants in the other language. value answers\n  what the question asks — \"stock is fine\" for a \"Low quantity?\" question is false. Numbers as\n  numbers, yes/no as true/false, dates as YYYY-MM-DD, a list pick as the option's text (several\n  as an array), free text as text. Photos, signatures and scans stay with the rep.\nThe card shows the answers and the rep confirms. Once the form is open, the result lists the\nanswers placed and those not placed, with the form's questions when one wasn't — tell the rep\nin a few words what is still theirs to fill.",
-      "since": "0.4.0",
+      "since": "0.5.0",
       "reports_result": true,
       "params": {
         "type": "object",
@@ -2429,6 +2428,179 @@
       ]
     },
     {
+      "name": "get_jobs",
+      "title": "Read the visit's jobs",
+      "summary": "Read the open visit's jobs (its checklist) and which are still pending — the phone answers at once, without asking the rep.",
+      "description": "Reads the jobs of the rep's open visit — the checklist the company assigns for it (forms,\nphotos, audits, retail execution…) — and whether each is done, skipped or still pending. It\nonly reads, so the phone answers at once: no card, nothing for the rep to confirm.\nUse it for \"what jobs do I have?\", \"what's left in this visit?\", \"can I end the visit?\". Jobs\nwith blocks_end_visit must be done before the visit can end. To take the rep to the list, use\nopen_jobs.",
+      "since": "0.4.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_name",
+          "pending",
+          "blocking",
+          "jobs"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The visit's client."
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Jobs still pending."
+          },
+          "blocking": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pending jobs that keep the visit from ending."
+          },
+          "jobs": {
+            "type": "array",
+            "description": "Every job of the visit, in the order the app lists them.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "category",
+                "type",
+                "status",
+                "blocks_end_visit"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The job category's name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "before_after",
+                    "photo",
+                    "note",
+                    "form",
+                    "form_v2",
+                    "audit",
+                    "availability",
+                    "shelf_share",
+                    "secondary_display",
+                    "checkout_display",
+                    "item_status",
+                    "retail_execution",
+                    "other"
+                  ],
+                  "description": "What the rep does for the job."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The job's own instructions, when it has any."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "done",
+                    "skipped"
+                  ]
+                },
+                "blocks_end_visit": {
+                  "type": "boolean",
+                  "description": "Still pending, and must be done before the visit can end."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "no_active_visit",
+          "description": "No visit is open, so there are no jobs to read."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "What's left in this visit?",
+          "request": {
+            "action": "get_jobs",
+            "params": {},
+            "summary": "Read this visit's jobs"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193301:0",
+            "action": "get_jobs",
+            "status": "success",
+            "data": {
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "pending": 2,
+              "blocking": 1,
+              "jobs": [
+                {
+                  "id": "65f1a2b3c4d5e6f708193a01",
+                  "category": "Weekly checks",
+                  "type": "form",
+                  "description": "Shelf condition survey",
+                  "status": "done",
+                  "blocks_end_visit": false
+                },
+                {
+                  "id": "65f1a2b3c4d5e6f708193a02",
+                  "category": "Weekly checks",
+                  "type": "photo",
+                  "description": "Photo of the promo stand",
+                  "status": "pending",
+                  "blocks_end_visit": true
+                },
+                {
+                  "id": "65f1a2b3c4d5e6f708193a03",
+                  "category": "Weekly checks",
+                  "type": "availability",
+                  "status": "pending",
+                  "blocks_end_visit": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "شو المهام اللي باقية علي؟",
+          "request": {
+            "action": "get_jobs",
+            "params": {},
+            "summary": "قراءة مهام الزيارة"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193302:0",
+            "action": "get_jobs",
+            "status": "failed",
+            "error": "No visit is open.",
+            "data": {
+              "code": "no_active_visit"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "navigate_to_client",
       "title": "Directions to a client",
       "summary": "Open turn-by-turn directions to one of the rep's clients in the phone's maps app.",
@@ -2751,7 +2923,7 @@
       "title": "Open the cart",
       "summary": "Open the order, invoice or return being prepared in the app's cart, for the rep to review and submit.",
       "description": "Opens the app's cart — the document being prepared: a sales order, return sales order, invoice\nor return invoice — so the rep can review, change and submit it. Use it for \"open my cart\",\n\"show me the order\", \"take me back to the invoice\". To change or remove lines use edit_cart; to\nadd products, build_order. kind only when the rep names the document: the phone checks the cart\nholds it.\nThe phone reports nothing back — not when the cart opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
-      "since": "0.4.0",
+      "since": "0.5.0",
       "reports_result": false,
       "params": {
         "type": "object",
@@ -2811,55 +2983,19 @@
     {
       "name": "open_jobs",
       "title": "Open the visit's jobs",
-      "summary": "Open the jobs of the rep's open visit — the list, or one job by name — for the rep to do them.",
-      "description": "Jobs are the activities set for the visit (forms, photos, audits, store checks, availability…),\nsome of them required before the visit can end — not tasks (open_screen tasks) or work orders.\nOpens the open visit's job list, or one job when the rep names it: job_name as the rep said it,\nplus job_name_variants, matched against the visit's jobs (the rep picks when several match).\nThere is no client to name: it is always the open visit. Use it for \"take me to my jobs\",\n\"start the shelf photo job\". To say what is done or still pending, read the jobs in the phone\nstate; open them when the rep wants to do them.\nThe phone reports nothing back — not when the jobs open, not when it fails (a failure only shows\non the card) — so tell the rep what they will see, not that it is done.",
+      "summary": "Open the Jobs tab of the rep's open visit, where they work through the visit's checklist.",
+      "description": "Opens the Jobs tab of the open visit's client screen — the checklist of forms, photos,\naudits… the company assigned — where the rep taps a job to do it. A floating \"back to\nassistant\" button brings the rep back to the chat. It needs an open visit (start_visit\nfirst). An empty list means the visit has no jobs yet; the tab refreshes them. To tell the rep\nwhat is pending, use get_jobs instead.\nThe phone reports nothing back — not when the tab opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
       "since": "0.4.0",
       "reports_result": false,
       "params": {
         "type": "object",
         "additionalProperties": false,
-        "properties": {
-          "job_name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "One job to open, as the rep said it. Leave it out to open the job list."
-          },
-          "job_name_variants": {
-            "type": "array",
-            "maxItems": 6,
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
-            "description": "Other spellings of job_name — jobs are often named in English when the rep speaks Arabic, or the reverse: e.g. \"صورة الرف\" → [\"Shelf photo\"]. Send it whenever you send job_name."
-          }
-        },
-        "dependencies": {
-          "job_name_variants": [
-            "job_name"
-          ]
-        }
+        "properties": {}
       },
       "errors": [
         {
           "code": "no_active_visit",
-          "description": "No visit is open on the phone."
-        },
-        {
-          "code": "no_jobs",
-          "description": "The open visit has no jobs."
-        },
-        {
-          "code": "job_not_found",
-          "description": "No job of the visit matched job_name."
-        },
-        {
-          "code": "activity_screen_open",
-          "description": "Another activity screen is already open in the app."
-        },
-        {
-          "code": "not_available",
-          "description": "Jobs are off for the rep (module or permission)."
+          "description": "No visit is open."
         },
         {
           "code": "error",
@@ -2868,25 +3004,19 @@
       ],
       "examples": [
         {
-          "says": "Take me to my jobs",
+          "says": "Show me my jobs",
           "request": {
             "action": "open_jobs",
             "params": {},
-            "summary": "Open your visit's jobs"
+            "summary": "Open this visit's jobs"
           }
         },
         {
-          "says": "خليني أبدأ بمهمة صورة الرف",
+          "says": "افتح المهام",
           "request": {
             "action": "open_jobs",
-            "params": {
-              "job_name": "صورة الرف",
-              "job_name_variants": [
-                "Shelf photo",
-                "Shelf picture"
-              ]
-            },
-            "summary": "فتح مهمة صورة الرف"
+            "params": {},
+            "summary": "فتح مهام الزيارة"
           }
         }
       ]

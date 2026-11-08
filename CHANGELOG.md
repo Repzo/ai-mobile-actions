@@ -1,37 +1,43 @@
 # Changelog
 
-## 0.4.0 — unreleased
+## 0.5.0 — unreleased
 
 From testing the app with the assistant on 2026-11-04.
 
-- The phone state: from 0.4.0 the app sends, with every chat request, the rep's day, the open
+- The phone state: from 0.5.0 the app sends, with every chat request, the rep's day, the open
   visit with its jobs and their status, and the cart, line by line (`mobile_actions.state`,
   `schemas/phone-state.schema.json`). The assistant reads it as `[phone-state] {…}`; the rep never
-  sees it. It answers "what are my jobs?" and "what's in my cart?" — the jobs and the cart live on
-  the phone, so the server can't.
-- Five new actions, all `since: 0.4.0`. The cart actions work for every document the cart holds
+  sees it. It answers "what's in my cart?" — the cart lives on the phone, so the server can't.
+- Four new actions, all `since: 0.5.0`. The cart actions work for every document the cart holds
   (sales order, return sales order, invoice, return invoice):
   - `edit_cart` — change quantities or units of lines in the cart, or remove lines;
   - `clear_cart` — empty the cart;
   - `open_cart` — open the cart to review and submit;
-  - `open_jobs` — open the open visit's jobs, or one job by name;
   - `fill_form` — fill a form with the rep's answers and open it filled for the rep to submit.
     Unlike `open_activity`'s prefill, it takes list picks and reports which answers were placed,
     with the form's questions when one wasn't.
 - Guidance:
-  - What jobs are: the open visit's activities — not tasks or work orders.
+  - "Pick the action": the list is examples, chosen from the actions the app has; it routes the
+    cart actions and `fill_form`; `open_activity` is for opening an activity; jobs are not tasks
+    or work orders.
   - The rep's language is the language of the rep's own latest message. `[action-result]` and
     `[phone-state]` messages come from the app and never change it: a result is answered in the
     language of the message that asked for the action.
   - When the rep asks for the API instead of an action: decline in one short sentence, with no
     reasons, and offer the action.
-  - "Pick the action": the list is examples, chosen from the actions the app has; open_activity
-    is for opening an activity.
   - How to use the phone state.
 - `open_activity`: for a form, `fill_form` replaces prefill when the app has it.
 - Package: `PHONE_STATE_SINCE`, `sendsPhoneState(version)`, `formatPhoneStateMessage(state)`,
   `parsePhoneStateMessage(message)` and the `PhoneState` type; `catalog.phone_state`;
   `transport.text.state_prefix`.
+
+## 0.4.0 — 2026-11-08
+
+Two new actions for the visit's jobs (its checklist), both `since: 0.4.0`.
+
+- `get_jobs`: reads the open visit's jobs — done, skipped or pending, and which keep the visit
+  from ending. The first read-only action: the phone answers at once, with no card to confirm.
+- `open_jobs`: opens the open visit's Jobs tab.
 
 ## 0.3.0 — 2026-11-03
 

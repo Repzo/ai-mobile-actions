@@ -36,16 +36,17 @@ definition only when it needs it.
 | [`build_order`](actions/build_order.yaml) | Prepare a sales order, return sales order, invoice or return invoice with the products the rep names — the phone fills the app's cart and opens it for the rep to review and submit. | yes | 0.1.0 |
 | [`build_transfer`](actions/build_transfer.yaml) | Prepare a van load or unload with the products the rep names, for the rep to review and submit. | yes | 0.3.0 |
 | [`call_client`](actions/call_client.yaml) | Dial a client's saved phone number from the phone, after the rep confirms. | no | 0.3.0 |
-| [`clear_cart`](actions/clear_cart.yaml) | Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms. | yes | 0.4.0 |
+| [`clear_cart`](actions/clear_cart.yaml) | Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms. | yes | 0.5.0 |
 | [`create_work_order`](actions/create_work_order.yaml) | Open a new work order or work request (CMMS) filled in, for the rep to submit. | no | 0.3.0 |
-| [`edit_cart`](actions/edit_cart.yaml) | Change quantities or units of lines in the order, invoice or return being prepared in the app's cart, or remove lines — for the rep to review and submit. | yes | 0.4.0 |
+| [`edit_cart`](actions/edit_cart.yaml) | Change quantities or units of lines in the order, invoice or return being prepared in the app's cart, or remove lines — for the rep to review and submit. | yes | 0.5.0 |
 | [`end_day`](actions/end_day.yaml) | End the rep's working day, with the app's own end-of-day checks. | yes | 0.3.0 |
 | [`end_visit`](actions/end_visit.yaml) | End the rep's open visit, through the app's own end-of-visit checks. | yes | 0.3.0 |
-| [`fill_form`](actions/fill_form.yaml) | Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to review and submit. | yes | 0.4.0 |
+| [`fill_form`](actions/fill_form.yaml) | Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to review and submit. | yes | 0.5.0 |
+| [`get_jobs`](actions/get_jobs.yaml) | Read the open visit's jobs (its checklist) and which are still pending — the phone answers at once, without asking the rep. | yes | 0.4.0 |
 | [`navigate_to_client`](actions/navigate_to_client.yaml) | Open turn-by-turn directions to one of the rep's clients in the phone's maps app. | no | 0.3.0 |
 | [`open_activity`](actions/open_activity.yaml) | Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete. | no | 0.1.0 |
-| [`open_cart`](actions/open_cart.yaml) | Open the order, invoice or return being prepared in the app's cart, for the rep to review and submit. | no | 0.4.0 |
-| [`open_jobs`](actions/open_jobs.yaml) | Open the jobs of the rep's open visit — the list, or one job by name — for the rep to do them. | no | 0.4.0 |
+| [`open_cart`](actions/open_cart.yaml) | Open the order, invoice or return being prepared in the app's cart, for the rep to review and submit. | no | 0.5.0 |
+| [`open_jobs`](actions/open_jobs.yaml) | Open the Jobs tab of the rep's open visit, where they work through the visit's checklist. | no | 0.4.0 |
 | [`open_screen`](actions/open_screen.yaml) | Open a screen of the mobile app — clients, calendar, tasks, reports, approvals, a client's profile, and more. | no | 0.1.0 |
 | [`record_payment`](actions/record_payment.yaml) | Open a client's payment screen filled in with the amount, method and invoice, for the rep to submit. | no | 0.3.0 |
 | [`request_input`](actions/request_input.yaml) | Ask the rep to fill a short form (text, numbers, dates, choices, yes/no) — use it when the rep tells you something to record or report. | yes | 0.1.0 |
@@ -83,14 +84,14 @@ The app answers with a message:
 
 ## The phone state
 
-From contract 0.4.0 the app sends, with every chat request, what it knows right now: the rep's
+From contract 0.5.0 the app sends, with every chat request, what it knows right now: the rep's
 day, the open visit with its jobs (pending, done or skipped), and the cart — the order, invoice or
 return being prepared, line by line. It goes in `mobile_actions.state`, next to the version:
 
 ```json
 {
   "mobile_actions": {
-    "version": "0.4.0",
+    "version": "0.5.0",
     "state": {
       "day": { "status": "active", "started_at": "2026-01-15T07:55:00.000Z" },
       "visit": {
@@ -136,7 +137,7 @@ getAction("build_order"); // the full definition: description, params, result, e
 extractActionBlock(reply); // { request, text } — the action block at the end of an assistant reply
 parseActionResultMessage(message); // the result in an "[action-result] …" message, or null
 
-sendsPhoneState("0.4.0"); // true — that app sends mobile_actions.state
+sendsPhoneState("0.5.0"); // true — that app sends mobile_actions.state
 formatPhoneStateMessage(state); // "[phone-state] {…}" — the state as the assistant reads it
 ```
 

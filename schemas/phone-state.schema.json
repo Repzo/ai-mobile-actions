@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "phone-state.schema.json",
   "title": "Phone state",
-  "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.4.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
+  "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.5.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
   "type": "object",
   "additionalProperties": false,
   "required": ["day", "visit", "cart"],

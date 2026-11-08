@@ -3,7 +3,7 @@ name: clear_cart
 title: Empty the cart
 summary: >-
   Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms.
-since: 0.4.0
+since: 0.5.0
 reports_result: true
 description: |-
   Empties the app's cart: every line of the document being prepared — a sales order, return sales
@@ -76,4 +76,4 @@ examples:
         code: cart_empty
 
 maintainer_notes:
-  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.

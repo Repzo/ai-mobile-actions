@@ -4,7 +4,7 @@ title: Change the cart's lines
 summary: >-
   Change quantities or units of lines in the order, invoice or return being prepared in the app's
   cart, or remove lines — for the rep to review and submit.
-since: 0.4.0
+since: 0.5.0
 reports_result: true
 description: |-
   Changes the document being prepared in the app's cart — a sales order, return sales order,
@@ -213,7 +213,7 @@ examples:
         kind: sales_order
 
 maintainer_notes:
-  - The app implements this from contract 0.4.0; until then the backend must not offer it.
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.
   - >-
     Asked for in testing on 2026-11-04: the rep asked to make every line 3, to delete a line and
     add it again, and to delete the whole cart — the assistant had no action for any of them.
