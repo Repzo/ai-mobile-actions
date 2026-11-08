@@ -9,8 +9,8 @@ reports_result: false
 description: |-
   Opens the app's cart — the document being prepared: a sales order, return sales order, invoice
   or return invoice — so the rep can review, change and submit it. Use it for "open my cart",
-  "show me the order", "take me back to the invoice". To change or remove lines use edit_cart; to
-  add products, build_order. kind only when the rep names the document: the phone checks the cart
+  "show me the order", "take me back to the invoice". To say what's in it use get_cart; to change
+  or remove lines, edit_cart; to add products, build_order. kind only when the rep names the document: the phone checks the cart
   holds it.
   The phone reports nothing back — not when the cart opens, not when it fails (a failure only
   shows on the card) — so tell the rep what they will see, not that it is done.

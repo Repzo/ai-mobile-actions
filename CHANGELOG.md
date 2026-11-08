@@ -2,34 +2,28 @@
 
 ## 0.5.0 — unreleased
 
-From testing the app with the assistant on 2026-11-04.
+From testing the app with the assistant on 2026-11-04. Five new actions, all `since: 0.5.0`.
 
-- The phone state: from 0.5.0 the app sends, with every chat request, the rep's day, the open
-  visit with its jobs and their status, and the cart, line by line (`mobile_actions.state`,
-  `schemas/phone-state.schema.json`). The assistant reads it as `[phone-state] {…}`; the rep never
-  sees it. It answers "what's in my cart?" — the cart lives on the phone, so the server can't.
-- Four new actions, all `since: 0.5.0`. The cart actions work for every document the cart holds
-  (sales order, return sales order, invoice, return invoice):
-  - `edit_cart` — change quantities or units of lines in the cart, or remove lines;
+- The cart, for every document it holds (sales order, return sales order, invoice, return
+  invoice):
+  - `get_cart` — read the cart line by line. Read-only, like `get_jobs`: the phone answers at
+    once, with no card to confirm;
+  - `edit_cart` — change quantities or units of lines, or remove lines;
   - `clear_cart` — empty the cart;
-  - `open_cart` — open the cart to review and submit;
-  - `fill_form` — fill a form with the rep's answers and open it filled for the rep to submit.
-    Unlike `open_activity`'s prefill, it takes list picks and reports which answers were placed,
-    with the form's questions when one wasn't.
+  - `open_cart` — open the cart to review and submit.
+- `fill_form` — fill a form with the rep's answers and open it filled for the rep to submit.
+  Unlike `open_activity`'s prefill, it takes list picks and reports which answers were placed,
+  with the form's questions when one wasn't.
 - Guidance:
   - "Pick the action": the list is examples, chosen from the actions the app has; it routes the
     cart actions and `fill_form`; `open_activity` is for opening an activity; jobs are not tasks
     or work orders.
-  - The rep's language is the language of the rep's own latest message. `[action-result]` and
-    `[phone-state]` messages come from the app and never change it: a result is answered in the
-    language of the message that asked for the action.
+  - The rep's language is the language of the rep's own latest message. `[action-result]`
+    messages come from the app and never change it: a result is answered in the language of the
+    message that asked for the action.
   - When the rep asks for the API instead of an action: decline in one short sentence, with no
     reasons, and offer the action.
-  - How to use the phone state.
 - `open_activity`: for a form, `fill_form` replaces prefill when the app has it.
-- Package: `PHONE_STATE_SINCE`, `sendsPhoneState(version)`, `formatPhoneStateMessage(state)`,
-  `parsePhoneStateMessage(message)` and the `PhoneState` type; `catalog.phone_state`;
-  `transport.text.state_prefix`.
 
 ## 0.4.0 — 2026-11-08
 

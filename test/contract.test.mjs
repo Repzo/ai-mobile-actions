@@ -9,19 +9,14 @@ import {
   ACTION_BLOCK,
   ACTION_RESULT_PREFIX,
   CONTRACT_VERSION,
-  PHONE_STATE_PREFIX,
-  PHONE_STATE_SINCE,
   catalog,
   extractActionBlock,
   formatActionBlock,
   formatActionResultMessage,
-  formatPhoneStateMessage,
   getAction,
   isActionName,
   listActions,
   parseActionResultMessage,
-  parsePhoneStateMessage,
-  sendsPhoneState,
 } from "../dist/index.js";
 
 const read = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
@@ -123,7 +118,7 @@ test("actions newer than the app's contract version are never offered to it", ()
 });
 
 test("the 0.5.0 actions are offered from 0.5.0 only", () => {
-  const added = ["edit_cart", "clear_cart", "open_cart", "fill_form"];
+  const added = ["get_cart", "edit_cart", "clear_cart", "open_cart", "fill_form"];
   const offered = (version) => listActions({ version }).map((action) => action.name);
   for (const name of added) {
     assert.ok(!offered("0.4.0").includes(name), `${name} is not offered to 0.4.0 apps`);
@@ -148,11 +143,10 @@ test("edit_cart: every entry changes something, and a removed line takes no new 
 
 test("the cart actions cover every document the cart can hold", () => {
   const kinds = getAction("build_order").params.properties.kind.enum;
-  assert.deepEqual(catalog.phone_state.schema.properties.cart.properties.kind.enum, kinds);
   for (const name of ["edit_cart", "clear_cart", "open_cart"]) {
     assert.deepEqual(getAction(name).params.properties.kind.enum, kinds, name);
   }
-  for (const name of ["edit_cart", "clear_cart"]) {
+  for (const name of ["get_cart", "edit_cart", "clear_cart"]) {
     assert.deepEqual(getAction(name).result.properties.kind.enum, kinds, name);
   }
   const clearCart = ajv.compile(getAction("clear_cart").params);
@@ -180,36 +174,6 @@ test("fill_form: a named form and at least one typed answer; the result says wha
   assert.equal(data({ ...base, placed: [], not_placed: [{ question: "Q" }] }), false, "a not-placed answer says why");
 });
 
-test("the phone state: its schema, its example and its text form", () => {
-  const validateState = ajv.compile(catalog.phone_state.schema);
-  const example = catalog.phone_state.example;
-  assert.ok(validateState(example), ajv.errorsText(validateState.errors));
-  assert.ok(validateState({ day: { status: "not_started" }, visit: null, cart: null }), "no visit, empty cart");
-  assert.equal(validateState({ day: { status: "active" } }), false, "visit and cart are always sent");
-  assert.equal(validateState({ ...example, sync: {} }), false, "no unknown parts");
-  const job = { name: "Shelf photo", status: "waiting" };
-  assert.equal(validateState({ ...example, visit: { ...example.visit, jobs: [job] } }), false, "a job's status");
-  assert.equal(
-    validateState({ ...example, cart: { ...example.cart, kind: "transfer" } }),
-    false,
-    "the cart holds an order, invoice or return",
-  );
-
-  assert.equal(PHONE_STATE_SINCE, "0.5.0");
-  assert.equal(sendsPhoneState("0.4.0"), false);
-  assert.equal(sendsPhoneState("0.5.0"), true);
-  assert.equal(sendsPhoneState("1.0.0"), true);
-  assert.throws(() => sendsPhoneState("0.4"), TypeError);
-
-  const message = formatPhoneStateMessage(example);
-  assert.ok(message.startsWith(`${PHONE_STATE_PREFIX} {`));
-  assert.doesNotMatch(message, /\n/, "one line");
-  assert.deepEqual(parsePhoneStateMessage(message), example);
-  assert.equal(parsePhoneStateMessage(`${PHONE_STATE_PREFIX} {"day":{}}`), null, "not a state");
-  assert.equal(parsePhoneStateMessage(formatActionResultMessage({ ref: "r", action: "a", status: "cancelled" })), null);
-  assert.equal(parsePhoneStateMessage("Hello"), null);
-});
-
 test("every action the guidance names is one of the catalog's actions", () => {
   const names = new Set(catalog.actions.map((action) => action.name));
   for (const rule of catalog.guidance) {
@@ -217,6 +181,18 @@ test("every action the guidance names is one of the catalog's actions", () => {
       assert.ok(names.has(word), `guidance names ${word}, which is not an action: ${rule}`);
     }
   }
+});
+
+test("get_cart only reads: no parameters, and a result for every document", () => {
+  const action = getAction("get_cart");
+  assert.equal(action.reports_result, true);
+  assert.equal(ajv.compile(action.params)({}), true);
+  assert.equal(ajv.compile(action.params)({ kind: "sales_order" }), false, "it reads whatever the cart holds");
+  const data = ajv.compile(action.result);
+  const base = { kind: "return_invoice", client_id: "1", client_name: "A" };
+  assert.equal(data({ ...base, lines: [{ product: "P", qty: 1, unit: "Piece" }] }), true);
+  assert.equal(data({ ...base, lines: [{ product: "P" }] }), false, "a line names its qty");
+  assert.deepEqual(action.errors.map((error) => error.code), ["cart_empty", "error"]);
 });
 
 test("the jobs actions arrive with 0.4.0 and take no parameters", () => {

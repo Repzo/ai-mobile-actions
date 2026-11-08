@@ -6,236 +6,18 @@ export const CATALOG: MobileActionsCatalog = {
   "version": "0.5.0",
   "guidance": [
     "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves. When the rep asks you to use the API instead, don't: reply in one short sentence, with no reasons, and offer the action.",
-    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs, which only reads the phone and answers at once.",
-    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; changing or emptying the cart → edit_cart or clear_cart, showing it → open_cart; filling a form with the rep's answers → fill_form; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs and get_cart, which only read the phone and answer at once.",
+    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; the cart being prepared → get_cart to read it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with the rep's answers → fill_form; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
     "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
     "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
     "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
-    "The rep's language is the language of the rep's own latest message, typed or spoken: write replies and action summaries in it. \"[action-result]\" and \"[phone-state]\" messages come from the app, not the rep, and never change it — answer a result in the language of the rep's message that asked for the action.",
-    "A message may come with a \"[phone-state] {…}\" note from the app: the rep's day, the open visit with its jobs, and the cart, as the phone has them at that moment. The latest one is current. Use it to answer (\"what are my jobs?\", \"what's in my cart?\") and to fill actions (the cart lines to change); don't recite it unasked. Without one, don't guess what is open or pending.",
+    "The rep's language is the language of the rep's own latest message, typed or spoken: write replies and action summaries in it. \"[action-result]\" messages come from the app, not the rep, and never change it — answer a result in the language of the rep's message that asked for the action.",
     "Replies are read on a phone: keep them short."
   ],
-  "phone_state": {
-    "since": "0.5.0",
-    "schema": {
-      "title": "Phone state",
-      "description": "What the app knows right now about the rep's day, open visit (with its jobs) and cart. From contract 0.5.0 the app sends it with every chat request as `mobile_actions.state`. The assistant gets it with that message only, as `[phone-state] {…}`; the rep never sees it. `visit` and `cart` are null when no visit is open or the cart is empty.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "day",
-        "visit",
-        "cart"
-      ],
-      "properties": {
-        "day": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "status"
-          ],
-          "description": "The rep's working day.",
-          "properties": {
-            "status": {
-              "type": "string",
-              "enum": [
-                "not_started",
-                "active",
-                "ended"
-              ],
-              "description": "not_started: not started today. active: started and not ended. ended: ended today."
-            },
-            "started_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When the day started (ISO 8601)."
-            }
-          }
-        },
-        "visit": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "client_id",
-            "client_name",
-            "started_at",
-            "jobs"
-          ],
-          "description": "The visit open on the phone, or null when none is open.",
-          "properties": {
-            "client_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "client_name": {
-              "type": "string",
-              "minLength": 1,
-              "description": "As saved."
-            },
-            "started_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When the visit started (ISO 8601)."
-            },
-            "jobs": {
-              "type": "array",
-              "maxItems": 60,
-              "description": "The visit's jobs, in the order the app lists them; empty when it has none.",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name",
-                  "status"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "As the app shows it."
-                  },
-                  "type": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "What the job is, in the app's words: form, photo, note, audit, availability, task, store_check, retail_execution, planogram…"
-                  },
-                  "required": {
-                    "type": "boolean",
-                    "description": "true: the visit can't end until it is done (or skipped with a request)."
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pending",
-                      "done",
-                      "skipped"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cart": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "client_id",
-            "client_name",
-            "lines"
-          ],
-          "description": "The document being prepared in the app's cart, or null when the cart is empty.",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": [
-                "sales_order",
-                "return_sales_order",
-                "invoice",
-                "return_invoice"
-              ]
-            },
-            "client_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "client_name": {
-              "type": "string",
-              "minLength": 1
-            },
-            "lines": {
-              "type": "array",
-              "maxItems": 100,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "product",
-                  "qty"
-                ],
-                "properties": {
-                  "product": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "The product's name as saved."
-                  },
-                  "qty": {
-                    "type": "number"
-                  },
-                  "unit": {
-                    "type": "string"
-                  },
-                  "variant": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "example": {
-      "day": {
-        "status": "active",
-        "started_at": "2026-01-15T07:55:00.000Z"
-      },
-      "visit": {
-        "client_id": "65f1a2b3c4d5e6f708192a01",
-        "client_name": "Al Noor Market",
-        "started_at": "2026-01-15T08:30:00.000Z",
-        "jobs": [
-          {
-            "name": "Availability survey",
-            "type": "form",
-            "required": true,
-            "status": "pending"
-          },
-          {
-            "name": "Shelf photo",
-            "type": "photo",
-            "required": true,
-            "status": "done"
-          },
-          {
-            "name": "Competitor prices",
-            "type": "form",
-            "required": false,
-            "status": "pending"
-          }
-        ]
-      },
-      "cart": {
-        "kind": "sales_order",
-        "client_id": "65f1a2b3c4d5e6f708192a01",
-        "client_name": "Al Noor Market",
-        "lines": [
-          {
-            "product": "Sunquick Orange 200 ml",
-            "qty": 5,
-            "unit": "Piece"
-          },
-          {
-            "product": "Pepsi 330 ml",
-            "qty": 3,
-            "unit": "Piece"
-          }
-        ]
-      }
-    }
-  },
   "transport": {
     "text": {
       "request_block": "repzo-action",
       "result_prefix": "[action-result]",
-      "state_prefix": "[phone-state]",
       "instructions": "To run an action, end your reply with exactly one fenced block whose info string is\nrepzo-action and whose body is the action request as JSON:\n```repzo-action\n{\"action\":\"<name>\",\"params\":{...},\"summary\":\"<one short line the rep will confirm>\"}\n```\nThe app answers with a message that starts with [action-result], followed by the action\nresult as JSON."
     }
   },
@@ -1362,7 +1144,7 @@ export const CATALOG: MobileActionsCatalog = {
       "name": "edit_cart",
       "title": "Change the cart's lines",
       "summary": "Change quantities or units of lines in the order, invoice or return being prepared in the app's cart, or remove lines — for the rep to review and submit.",
-      "description": "Changes the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice, whichever it holds — and opens the cart for the rep to review and\nsubmit (it never submits anything itself). Use it when the rep changes lines already in the\ncart: \"make it 3\", \"change the Pepsi to cartons\", \"remove the coffee\", \"3 of each\". To add\nproducts use build_order; to empty the whole cart, clear_cart.\n- lines: one entry per line to change, named as the rep said it or as the cart shows it, plus\n  product_variants. The phone matches them against the cart's lines only, never the whole\n  catalog; when several lines match (one product in two units or variants), the rep picks on\n  the card. For \"each line\" or \"all of them\", list every line of the phone state's cart (or of\n  the last build_order result).\n- qty is the line's new quantity, not a difference: \"2 more\" on a line of 3 is qty 5. unit only\n  when the rep names a new one, in English (\"carton\", \"box\", \"piece\"). remove: true takes the\n  line out.\n- kind only when the rep names the document (\"the return\"): the phone checks the cart holds it.\nThe action succeeds when at least one line changed: the result lists the lines changed, removed\nand failed — summarize them briefly. It fails as a whole when the cart is empty or no line could\nbe changed.",
+      "description": "Changes the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice, whichever it holds — and opens the cart for the rep to review and\nsubmit (it never submits anything itself). Use it when the rep changes lines already in the\ncart: \"make it 3\", \"change the Pepsi to cartons\", \"remove the coffee\", \"3 of each\". To add\nproducts use build_order; to empty the whole cart, clear_cart.\n- lines: one entry per line to change, named as the rep said it or as the cart shows it, plus\n  product_variants. The phone matches them against the cart's lines only, never the whole\n  catalog; when several lines match (one product in two units or variants), the rep picks on\n  the card. For \"each line\" or \"all of them\", list every line — read them with get_cart when\n  you don't have them (the rep may have changed the cart by hand since the last build_order).\n- qty is the line's new quantity, not a difference: \"2 more\" on a line of 3 is qty 5. unit only\n  when the rep names a new one, in English (\"carton\", \"box\", \"piece\"). remove: true takes the\n  line out.\n- kind only when the rep names the document (\"the return\"): the phone checks the cart holds it.\nThe action succeeds when at least one line changed: the result lists the lines changed, removed\nand failed — summarize them briefly. It fails as a whole when the cart is empty or no line could\nbe changed.",
       "since": "0.5.0",
       "reports_result": true,
       "params": {
@@ -2431,6 +2213,132 @@ export const CATALOG: MobileActionsCatalog = {
       ]
     },
     {
+      "name": "get_cart",
+      "title": "Read the cart",
+      "summary": "Read the order, invoice or return being prepared in the app's cart, line by line — the phone answers at once, without asking the rep.",
+      "description": "Reads the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice — with its client and every line. It only reads, so the phone answers\nat once: no card, nothing for the rep to confirm.\nUse it for \"what's in my cart?\", \"what did I order?\", and before edit_cart when the rep means\nlines you don't have (\"3 of each\") — the rep may have changed the cart by hand since the last\nbuild_order. To show the cart to the rep, use open_cart.",
+      "since": "0.5.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "client_id",
+          "client_name",
+          "lines"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "The document being prepared."
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The client it is for."
+          },
+          "lines": {
+            "type": "array",
+            "description": "Every line, in the order the cart lists them.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "cart_empty",
+          "description": "The cart is empty — nothing is being prepared."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "What's in my cart?",
+          "request": {
+            "action": "get_cart",
+            "params": {},
+            "summary": "Read your cart"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193401:0",
+            "action": "get_cart",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "lines": [
+                {
+                  "product": "Sunquick Orange 200 ml",
+                  "qty": 5,
+                  "unit": "Piece"
+                },
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 3,
+                  "unit": "Piece"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "شو في السلة؟",
+          "request": {
+            "action": "get_cart",
+            "params": {},
+            "summary": "قراءة السلة"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193402:0",
+            "action": "get_cart",
+            "status": "failed",
+            "error": "The cart is empty.",
+            "data": {
+              "code": "cart_empty"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "get_jobs",
       "title": "Read the visit's jobs",
       "summary": "Read the open visit's jobs (its checklist) and which are still pending — the phone answers at once, without asking the rep.",
@@ -2925,7 +2833,7 @@ export const CATALOG: MobileActionsCatalog = {
       "name": "open_cart",
       "title": "Open the cart",
       "summary": "Open the order, invoice or return being prepared in the app's cart, for the rep to review and submit.",
-      "description": "Opens the app's cart — the document being prepared: a sales order, return sales order, invoice\nor return invoice — so the rep can review, change and submit it. Use it for \"open my cart\",\n\"show me the order\", \"take me back to the invoice\". To change or remove lines use edit_cart; to\nadd products, build_order. kind only when the rep names the document: the phone checks the cart\nholds it.\nThe phone reports nothing back — not when the cart opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
+      "description": "Opens the app's cart — the document being prepared: a sales order, return sales order, invoice\nor return invoice — so the rep can review, change and submit it. Use it for \"open my cart\",\n\"show me the order\", \"take me back to the invoice\". To say what's in it use get_cart; to change\nor remove lines, edit_cart; to add products, build_order. kind only when the rep names the document: the phone checks the cart\nholds it.\nThe phone reports nothing back — not when the cart opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
       "since": "0.5.0",
       "reports_result": false,
       "params": {

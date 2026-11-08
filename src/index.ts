@@ -72,20 +72,6 @@ export function getAction(
   return action && isOffered(action, filter) ? action : undefined;
 }
 
-/** The contract version from which the app sends the phone state. */
-export const PHONE_STATE_SINCE: string = CATALOG.phone_state.since;
-
-/**
- * Whether an app on contract `version` sends the phone state (`mobile_actions.state`) with its
- * chat requests.
- */
-export function sendsPhoneState(version: string): boolean {
-  if (!VERSION.test(version)) {
-    throw new TypeError(`version must look like 1.2.3, got '${version}'`);
-  }
-  return compareVersions(version, PHONE_STATE_SINCE) >= 0;
-}
-
 /** Whether `name` is one of the catalog's actions. */
 export function isActionName(name: unknown): name is ActionName {
   return typeof name === "string" && CATALOG.actions.some((action) => action.name === name);

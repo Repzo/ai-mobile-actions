@@ -258,8 +258,8 @@ maintainer_notes:
   - >-
     Owner, 2026-11-04: everything that works for a sales order must work the same for an invoice
     and a return — "Start visit & build", building outside a visit when the rep may sell outside
-    one, return_reason, and the cart actions of 0.5.0 (edit_cart, clear_cart, open_cart). App
-    team: say where the app still differs, and we'll write it down here.
+    one, return_reason, and the cart actions of 0.5.0 (get_cart, edit_cart, clear_cart,
+    open_cart). App team: say where the app still differs, and we'll write it down here.
   - >-
     Testing on 2026-11-04: a sales order for a product came back no_items_added /
     product_not_found, and the same request worked three minutes later — after the rep had opened

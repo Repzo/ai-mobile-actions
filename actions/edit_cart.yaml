@@ -15,8 +15,8 @@ description: |-
   - lines: one entry per line to change, named as the rep said it or as the cart shows it, plus
     product_variants. The phone matches them against the cart's lines only, never the whole
     catalog; when several lines match (one product in two units or variants), the rep picks on
-    the card. For "each line" or "all of them", list every line of the phone state's cart (or of
-    the last build_order result).
+    the card. For "each line" or "all of them", list every line — read them with get_cart when
+    you don't have them (the rep may have changed the cart by hand since the last build_order).
   - qty is the line's new quantity, not a difference: "2 more" on a line of 3 is qty 5. unit only
     when the rep names a new one, in English ("carton", "box", "piece"). remove: true takes the
     line out.

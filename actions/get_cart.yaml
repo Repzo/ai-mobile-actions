@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: get_cart
+title: Read the cart
+summary: >-
+  Read the order, invoice or return being prepared in the app's cart, line by line — the phone
+  answers at once, without asking the rep.
+since: 0.5.0
+reports_result: true
+description: |-
+  Reads the document being prepared in the app's cart — a sales order, return sales order,
+  invoice or return invoice — with its client and every line. It only reads, so the phone answers
+  at once: no card, nothing for the rep to confirm.
+  Use it for "what's in my cart?", "what did I order?", and before edit_cart when the rep means
+  lines you don't have ("3 of each") — the rep may have changed the cart by hand since the last
+  build_order. To show the cart to the rep, use open_cart.
+
+params:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+result:
+  type: object
+  required: [kind, client_id, client_name, lines]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: The document being prepared.
+    client_id: { type: string }
+    client_name: { type: string, description: The client it is for. }
+    lines:
+      type: array
+      description: Every line, in the order the cart lists them.
+      items:
+        type: object
+        required: [product, qty]
+        properties:
+          product: { type: string, description: The product's name as saved. }
+          qty: { type: number }
+          unit: { type: string }
+          variant: { type: string }
+
+errors:
+  - code: cart_empty
+    description: The cart is empty — nothing is being prepared.
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: What's in my cart?
+    request:
+      action: get_cart
+      params: {}
+      summary: Read your cart
+    result:
+      ref: "65f1a2b3c4d5e6f708193401:0"
+      action: get_cart
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        lines:
+          - { product: Sunquick Orange 200 ml, qty: 5, unit: Piece }
+          - { product: Pepsi 330 ml, qty: 3, unit: Piece }
+  - says: شو في السلة؟
+    request:
+      action: get_cart
+      params: {}
+      summary: قراءة السلة
+    result:
+      ref: "65f1a2b3c4d5e6f708193402:0"
+      action: get_cart
+      status: failed
+      error: The cart is empty.
+      data:
+        code: cart_empty
+
+maintainer_notes:
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.
+  - >-
+    Read-only, like get_jobs: the app runs it as soon as it arrives and sends the result without
+    a confirmation card. The cart lives on the phone until the document is submitted, so the
+    server can't read it.
+  - >-
+    App team: should the result carry the document's totals (net, tax, total)? Reps ask "how much
+    is my order?". Add them as optional fields if the cart has them.

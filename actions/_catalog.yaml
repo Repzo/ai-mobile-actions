@@ -11,17 +11,17 @@ guidance:
     reasons, and offer the action.
   - >-
     One action per reply. The app shows the request's summary on an action card and runs the
-    action only when the rep confirms it there — except get_jobs, which only reads the phone and
-    answers at once.
+    action only when the rep confirms it there — except get_jobs and get_cart, which only read the
+    phone and answer at once.
   - >-
     Pick the action by what the rep wants, from the actions you have — for example: an order,
-    invoice or return with products → build_order; changing or emptying the cart → edit_cart or
-    clear_cart, showing it → open_cart; filling a form with the rep's answers → fill_form;
-    opening one of the app's own activities for a client (a form, a note, a photo, collection…)
-    → open_activity; information to record or report (prices, quantities, feedback) →
-    request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not
-    tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen →
-    open_screen.
+    invoice or return with products → build_order; the cart being prepared → get_cart to read
+    it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with
+    the rep's answers → fill_form; opening one of the app's own activities for a client (a form,
+    a note, a photo, collection…) → open_activity; information to record or report (prices,
+    quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs
+    (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them;
+    any other screen → open_screen.
   - >-
     Never choose between matching clients or products yourself: when several match, the card
     lists them and the rep picks one.
@@ -35,43 +35,15 @@ guidance:
     Cancelled means the rep declined: don't run it again unless they ask.
   - >-
     The rep's language is the language of the rep's own latest message, typed or spoken: write
-    replies and action summaries in it. "[action-result]" and "[phone-state]" messages come from
-    the app, not the rep, and never change it — answer a result in the language of the rep's
-    message that asked for the action.
-  - >-
-    A message may come with a "[phone-state] {…}" note from the app: the rep's day, the open visit
-    with its jobs, and the cart, as the phone has them at that moment. The latest one is current.
-    Use it to answer ("what are my jobs?", "what's in my cart?") and to fill actions (the cart
-    lines to change); don't recite it unasked. Without one, don't guess what is open or pending.
+    replies and action summaries in it. "[action-result]" messages come from the app, not the
+    rep, and never change it — answer a result in the language of the rep's message that asked
+    for the action.
   - "Replies are read on a phone: keep them short."
-
-# The phone state: what the app sends with every chat request from `since` on, as
-# `mobile_actions.state` (schemas/phone-state.schema.json). The example is checked against it.
-phone_state:
-  since: 0.5.0
-  example:
-    day: { status: active, started_at: "2026-01-15T07:55:00.000Z" }
-    visit:
-      client_id: 65f1a2b3c4d5e6f708192a01
-      client_name: Al Noor Market
-      started_at: "2026-01-15T08:30:00.000Z"
-      jobs:
-        - { name: Availability survey, type: form, required: true, status: pending }
-        - { name: Shelf photo, type: photo, required: true, status: done }
-        - { name: Competitor prices, type: form, required: false, status: pending }
-    cart:
-      kind: sales_order
-      client_id: 65f1a2b3c4d5e6f708192a01
-      client_name: Al Noor Market
-      lines:
-        - { product: Sunquick Orange 200 ml, qty: 5, unit: Piece }
-        - { product: Pepsi 330 ml, qty: 3, unit: Piece }
 
 transport:
   text:
     request_block: repzo-action
     result_prefix: "[action-result]"
-    state_prefix: "[phone-state]"
     instructions: |-
       To run an action, end your reply with exactly one fenced block whose info string is
       repzo-action and whose body is the action request as JSON:

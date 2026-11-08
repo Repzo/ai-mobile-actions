@@ -67,23 +67,8 @@ export interface TextTransport {
   request_block: string;
   /** How the app's result message starts. */
   result_prefix: string;
-  /** How the phone state starts when the assistant reads it as text. */
-  state_prefix: string;
   /** How to ask for an action, for the assistant. */
   instructions: string;
-}
-
-/**
- * The phone state: what the app knows right now about the rep's day, open visit (with its jobs)
- * and cart, sent with every chat request from `since` on.
- */
-export interface PhoneStateDefinition {
-  /** The contract version from which the app sends it. */
-  since: string;
-  /** JSON Schema (draft-07) of the state. */
-  schema: JsonSchema;
-  /** A state that matches the schema. */
-  example: Record<string, unknown>;
 }
 
 export interface MobileActionsCatalog {
@@ -92,7 +77,6 @@ export interface MobileActionsCatalog {
   version: string;
   /** Rules that apply to every action, for the assistant. */
   guidance: string[];
-  phone_state: PhoneStateDefinition;
   transport: { text: TextTransport };
   actions: MobileActionDefinition[];
 }
