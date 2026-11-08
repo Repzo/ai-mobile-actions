@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0 — unreleased
+
+From testing the app with the assistant on 2026-11-04. Five new actions, all `since: 0.5.0`.
+
+- The cart, for every document it holds (sales order, return sales order, invoice, return
+  invoice):
+  - `get_cart` — read the cart line by line. Read-only, like `get_jobs`: the phone answers at
+    once, with no card to confirm;
+  - `edit_cart` — change quantities or units of lines, or remove lines;
+  - `clear_cart` — empty the cart;
+  - `open_cart` — open the cart to review and submit.
+- `fill_form` — fill a form with the rep's answers and open it filled for the rep to submit.
+  Unlike `open_activity`'s prefill, it takes list picks and reports which answers were placed,
+  with the form's questions when one wasn't.
+- Guidance:
+  - "Pick the action": the list is examples, chosen from the actions the app has; it routes the
+    cart actions and `fill_form`; `open_activity` is for opening an activity; jobs are not tasks
+    or work orders.
+  - The rep's language is the language of the rep's own latest message. `[action-result]`
+    messages come from the app and never change it: a result is answered in the language of the
+    message that asked for the action.
+  - When the rep asks for the API instead of an action: decline in one short sentence, with no
+    reasons, and offer the action.
+- `open_activity`: for a form, `fill_form` replaces prefill when the app has it.
+
 ## 0.4.0 — 2026-11-08
 
 Two new actions for the visit's jobs (its checklist), both `since: 0.4.0`.

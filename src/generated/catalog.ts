@@ -3,14 +3,15 @@ import type { MobileActionsCatalog } from "../types.js";
 
 export const CATALOG: MobileActionsCatalog = {
   "name": "repzo-ai-mobile-actions",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "guidance": [
-    "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves.",
-    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs, which only reads the phone and answers at once.",
-    "Pick the action by what the rep wants: an order, invoice or return with products → build_order; one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
+    "The phone runs these actions itself, with the app's own checks (GPS geofence, route and visit rules, client verification, offline data). For anything an action covers, use the action — not the Repzo API directly — and never tell the rep to go somewhere in the app themselves. When the rep asks you to use the API instead, don't: reply in one short sentence, with no reasons, and offer the action.",
+    "One action per reply. The app shows the request's summary on an action card and runs the action only when the rep confirms it there — except get_jobs and get_cart, which only read the phone and answer at once.",
+    "Pick the action by what the rep wants, from the actions you have — for example: an order, invoice or return with products → build_order; the cart being prepared → get_cart to read it, open_cart to show it, edit_cart or clear_cart to change or empty it; filling a form with the rep's answers → fill_form; opening one of the app's own activities for a client (a form, a note, a photo, collection…) → open_activity; information to record or report (prices, quantities, feedback) → request_input; starting a visit → start_visit; the open visit's jobs (its checklist — not tasks or work orders) → get_jobs to read them, open_jobs to show them; any other screen → open_screen.",
     "Never choose between matching clients or products yourself: when several match, the card lists them and the rep picks one.",
     "Don't say an action worked before its result arrives. open_screen and open_activity never report back, not even a failure — say what the rep will see, not that it is done. A result can come much later, or never: the rep may leave the card.",
     "When a result comes back failed, explain it briefly in the rep's language (error is an English sentence for you) and suggest a fix; never retry the same action on your own. Cancelled means the rep declined: don't run it again unless they ask.",
+    "The rep's language is the language of the rep's own latest message, typed or spoken: write replies and action summaries in it. \"[action-result]\" messages come from the app, not the rep, and never change it — answer a result in the language of the rep's message that asked for the action.",
     "Replies are read on a phone: keep them short."
   ],
   "transport": {
@@ -910,6 +911,131 @@ export const CATALOG: MobileActionsCatalog = {
       ]
     },
     {
+      "name": "clear_cart",
+      "title": "Empty the cart",
+      "summary": "Empty the app's cart — drop the order, invoice or return being prepared, once the rep confirms.",
+      "description": "Empties the app's cart: every line of the document being prepared — a sales order, return sales\norder, invoice or return invoice — is removed and the draft is dropped. Nothing already\nsubmitted is touched. Use it only when the rep asks to empty, clear or cancel the cart or start\nit over (\"delete the whole cart\", \"cancel this order\") — never on your own, not even to get\npast a mixed_cart failure (suggest it instead). To remove some lines, use edit_cart.\nkind only when the rep names the document: the phone checks the cart holds it.\nThe result says how many lines were removed, or why the cart couldn't be emptied.",
+      "since": "0.5.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "Only when the rep names the document; the phone checks the cart holds it."
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "client_id",
+          "client_name",
+          "lines_removed"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "The document that was dropped."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client it was for."
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "lines_removed": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "cart_empty",
+          "description": "The cart is already empty."
+        },
+        {
+          "code": "kind_mismatch",
+          "description": "The cart holds another document, data.kind.",
+          "data": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "sales_order",
+                "return_sales_order",
+                "invoice",
+                "return_invoice"
+              ]
+            }
+          }
+        },
+        {
+          "code": "not_available",
+          "description": "Emptying the cart is off for the rep (module or permission)."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "احذف السلة كلها",
+          "request": {
+            "action": "clear_cart",
+            "params": {},
+            "summary": "تفريغ السلة بالكامل"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d11:0",
+            "action": "clear_cart",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "lines_removed": 2
+            }
+          }
+        },
+        {
+          "says": "Cancel the return",
+          "request": {
+            "action": "clear_cart",
+            "params": {
+              "kind": "return_invoice"
+            },
+            "summary": "Empty the cart (return invoice)"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d12:0",
+            "action": "clear_cart",
+            "status": "failed",
+            "error": "The cart is already empty.",
+            "data": {
+              "code": "cart_empty"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "create_work_order",
       "title": "Create a work order or work request",
       "summary": "Open a new work order or work request (CMMS) filled in, for the rep to submit.",
@@ -1010,6 +1136,413 @@ export const CATALOG: MobileActionsCatalog = {
               "priority": "high"
             },
             "summary": "Report the fridge at Al Noor Market (not cooling)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "edit_cart",
+      "title": "Change the cart's lines",
+      "summary": "Change quantities or units of lines in the order, invoice or return being prepared in the app's cart, or remove lines — for the rep to review and submit.",
+      "description": "Changes the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice, whichever it holds — and opens the cart for the rep to review and\nsubmit (it never submits anything itself). Use it when the rep changes lines already in the\ncart: \"make it 3\", \"change the Pepsi to cartons\", \"remove the coffee\", \"3 of each\". To add\nproducts use build_order; to empty the whole cart, clear_cart.\n- lines: one entry per line to change, named as the rep said it or as the cart shows it, plus\n  product_variants. The phone matches them against the cart's lines only, never the whole\n  catalog; when several lines match (one product in two units or variants), the rep picks on\n  the card. For \"each line\" or \"all of them\", list every line — read them with get_cart when\n  you don't have them (the rep may have changed the cart by hand since the last build_order).\n- qty is the line's new quantity, not a difference: \"2 more\" on a line of 3 is qty 5. unit only\n  when the rep names a new one, in English (\"carton\", \"box\", \"piece\"). remove: true takes the\n  line out.\n- kind only when the rep names the document (\"the return\"): the phone checks the cart holds it.\nThe action succeeds when at least one line changed: the result lists the lines changed, removed\nand failed — summarize them briefly. It fails as a whole when the cart is empty or no line could\nbe changed.",
+      "since": "0.5.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lines"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "Only when the rep names the document; the phone checks the cart holds it."
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "product"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The line's product, as the rep said it or as the cart shows it."
+                },
+                "product_variants": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Other spellings of product — products are often saved in English or under a local Arabic name: send other-script spellings and transliterations, e.g. \"بيبسي\" → [\"Pepsi\"]."
+                },
+                "variant": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only to tell apart two lines of one product — \"330ml\", \"Diet\"."
+                },
+                "qty": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The line's new quantity — in unit when given, else in the line's unit."
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A new unit, only when the rep names one, in English — \"carton\", \"box\", \"piece\"."
+                },
+                "remove": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Take the line out of the cart."
+                }
+              },
+              "anyOf": [
+                {
+                  "required": [
+                    "qty"
+                  ]
+                },
+                {
+                  "required": [
+                    "unit"
+                  ]
+                },
+                {
+                  "required": [
+                    "remove"
+                  ]
+                }
+              ],
+              "if": {
+                "required": [
+                  "remove"
+                ]
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "qty"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "unit"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "client_id",
+          "client_name",
+          "changed",
+          "removed",
+          "failed",
+          "lines_left"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ]
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client the document is for."
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "changed": {
+            "type": "array",
+            "description": "The lines changed, as they are now.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                },
+                "previous_qty": {
+                  "type": "number",
+                  "description": "The line's quantity before the change."
+                },
+                "requested_qty": {
+                  "type": "number",
+                  "description": "The quantity asked for, when the line took a different one — e.g. a van invoice, capped at the stock left on the van."
+                }
+              }
+            }
+          },
+          "removed": {
+            "type": "array",
+            "description": "The lines taken out.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "failed": {
+            "type": "array",
+            "description": "The entries that could not be applied.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "code"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product as it was asked for."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Why: line_not_found (no line in the cart matched), line_ambiguous (several matched and none was picked), unit_not_found, unit_not_allowed, fractional_qty_not_allowed, out_of_stock, or error."
+                }
+              }
+            }
+          },
+          "lines_left": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many lines the cart holds now."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "cart_empty",
+          "description": "The cart is empty — nothing is being prepared."
+        },
+        {
+          "code": "kind_mismatch",
+          "description": "The cart holds another document, data.kind.",
+          "data": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "sales_order",
+                "return_sales_order",
+                "invoice",
+                "return_invoice"
+              ]
+            }
+          }
+        },
+        {
+          "code": "not_available",
+          "description": "Changing the cart is off for the rep (module or permission)."
+        },
+        {
+          "code": "no_changes",
+          "description": "No line could be changed; data.failed says why, line by line.",
+          "data": {
+            "changed": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "removed": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "failed": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Make the Pepsi 5 and remove the water",
+          "request": {
+            "action": "edit_cart",
+            "params": {
+              "lines": [
+                {
+                  "product": "Pepsi",
+                  "product_variants": [
+                    "بيبسي"
+                  ],
+                  "qty": 5
+                },
+                {
+                  "product": "water",
+                  "product_variants": [
+                    "مياه",
+                    "مي"
+                  ],
+                  "remove": true
+                }
+              ]
+            },
+            "summary": "Pepsi to 5, remove the water"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d01:0",
+            "action": "edit_cart",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "changed": [
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 5,
+                  "unit": "Piece",
+                  "previous_qty": 3
+                }
+              ],
+              "removed": [
+                {
+                  "product": "Mineral Water 500 ml",
+                  "qty": 5,
+                  "unit": "Carton"
+                }
+              ],
+              "failed": [],
+              "lines_left": 2
+            }
+          }
+        },
+        {
+          "says": "خلي الكميات ثلاث ثلاث من كل بند",
+          "request": {
+            "action": "edit_cart",
+            "params": {
+              "lines": [
+                {
+                  "product": "Sunquick Orange 200 ml",
+                  "qty": 3
+                },
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 3
+                }
+              ]
+            },
+            "summary": "كل بند في السلة ٣ حبات"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d02:0",
+            "action": "edit_cart",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "changed": [
+                {
+                  "product": "Sunquick Orange 200 ml",
+                  "qty": 3,
+                  "unit": "Piece",
+                  "previous_qty": 5
+                },
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 3,
+                  "unit": "Piece",
+                  "previous_qty": 3
+                }
+              ],
+              "removed": [],
+              "failed": [],
+              "lines_left": 2
+            }
+          }
+        },
+        {
+          "says": "Remove the juice from the return",
+          "request": {
+            "action": "edit_cart",
+            "params": {
+              "kind": "return_invoice",
+              "lines": [
+                {
+                  "product": "juice",
+                  "product_variants": [
+                    "عصير"
+                  ],
+                  "remove": true
+                }
+              ]
+            },
+            "summary": "Remove the juice from the return"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192d03:0",
+            "action": "edit_cart",
+            "status": "failed",
+            "error": "The cart holds a sales order, not a return invoice.",
+            "data": {
+              "code": "kind_mismatch",
+              "kind": "sales_order"
+            }
           }
         }
       ]
@@ -1234,6 +1767,572 @@ export const CATALOG: MobileActionsCatalog = {
                 "Shelf photo",
                 "Competitor prices"
               ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "fill_form",
+      "title": "Fill a form",
+      "summary": "Fill one of the app's forms with the answers the rep gives and open it filled, for the rep to review and submit.",
+      "description": "Fills a form for a client with what the rep told you and opens it, filled, for the rep to\nreview and submit — the phone never submits it. Use it whenever the rep tells you what to put\nin a form (\"fill the availability survey: Sunquick available, stock is fine\"), rather than\nopen_activity's prefill; to open a form with no answers, use open_activity.\n- form_name as the rep named it, plus form_name_variants (forms are often named in English when\n  the rep speaks Arabic, or the reverse). When several forms match, the rep picks on the card.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;\n  the client is matched as for start_visit.\n- answers: one per question. question: the question as the form words it when you know it,\n  else the rep's 1–4 key words, with question_variants in the other language. value answers\n  what the question asks — \"stock is fine\" for a \"Low quantity?\" question is false. Numbers as\n  numbers, yes/no as true/false, dates as YYYY-MM-DD, a list pick as the option's text (several\n  as an array), free text as text. Photos, signatures and scans stay with the rep.\nThe card shows the answers and the rep confirms. Once the form is open, the result lists the\nanswers placed and those not placed, with the form's questions when one wasn't — tell the rep\nin a few words what is still theirs to fill.",
+      "since": "0.5.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "form_name",
+          "answers"
+        ],
+        "properties": {
+          "form_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form as the rep named it."
+          },
+          "form_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of form_name — the other language or script, e.g. \"استبيان التوفر\" → [\"Availability survey\"]."
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's name as the rep said it. The phone looks it up in the rep's own client list, so never look the client up first."
+          },
+          "client_name_variants": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Other spellings of client_name. Client names are usually saved in Latin letters even when the rep speaks Arabic: send its common Latin transliterations, and its Arabic spelling when the rep wrote Latin letters — e.g. \"سوبر كريم\" → [\"Super Kareem\", \"Super Karim\"]. Send it whenever you send client_name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client's id — only when you already have it, for example from an earlier action's result. Otherwise send client_name."
+          },
+          "nearest": {
+            "type": "boolean",
+            "const": true,
+            "description": "Let the rep pick from their own clients ranked by live GPS distance, nearest first. Use it for \"the nearest client\", \"the closest one\", \"near me\"."
+          },
+          "answers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 60,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "question",
+                "value"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The question as the form words it when you know it, else the rep's 1–4 key words for it."
+                },
+                "question_variants": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The question in the other language — forms are often worded in Arabic when the rep speaks English, or the reverse."
+                },
+                "value": {
+                  "description": "Numbers as numbers, yes/no as true/false, dates as YYYY-MM-DD, a list pick as the option's text, several picks as an array, free text as text.",
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "form_name",
+          "client_id",
+          "client_name",
+          "placed",
+          "not_placed"
+        ],
+        "properties": {
+          "form_name": {
+            "type": "string",
+            "description": "The form as saved."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client the form is for."
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "placed": {
+            "type": "array",
+            "description": "The answers placed, under the form's own questions.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "value"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "The question as the form words it."
+                },
+                "value": {
+                  "description": "The answer as placed.",
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "not_placed": {
+            "type": "array",
+            "description": "The answers that could not be placed.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "code"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "The question as it was sent."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Why: question_not_found (no question matched), question_ambiguous (several matched), value_not_allowed (not one of the question's options, or not the kind of value it takes), rep_only (a photo, signature or scan — the rep fills it), or error."
+                }
+              }
+            }
+          },
+          "questions": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "The form's questions — sent when an answer wasn't placed.",
+            "items": {
+              "type": "object",
+              "required": [
+                "question",
+                "type"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "description": "As the form words it."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "text, number, yes_no, date, list, media, signature…"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A list question's options (the first 30)."
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "client_required",
+          "description": "No visit is open and no client was named."
+        },
+        {
+          "code": "client_not_found",
+          "description": "No client matched data.client_name.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "no_location",
+          "description": "nearest: the phone has no GPS fix."
+        },
+        {
+          "code": "no_nearby_client",
+          "description": "nearest: none of the rep's clients is nearby."
+        },
+        {
+          "code": "visit_open_for_other_client",
+          "description": "A visit is open at another client, data.client_name; the form can only be for it.",
+          "data": {
+            "client_name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "code": "form_not_found",
+          "description": "No form matched form_name; data.forms lists up to five of the rep's forms with the closest names.",
+          "data": {
+            "forms": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "code": "form_needs_sync",
+          "description": "The form isn't on the phone yet; the app has to sync first."
+        },
+        {
+          "code": "not_available",
+          "description": "Forms are off for the rep (module or permission)."
+        },
+        {
+          "code": "activity_screen_open",
+          "description": "Another activity screen is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Fill the availability survey for Sunquick orange — available, and stock is fine",
+          "request": {
+            "action": "fill_form",
+            "params": {
+              "form_name": "availability survey",
+              "form_name_variants": [
+                "استبيان التوفر"
+              ],
+              "answers": [
+                {
+                  "question": "Available",
+                  "question_variants": [
+                    "متوفر"
+                  ],
+                  "value": true
+                },
+                {
+                  "question": "Low quantity",
+                  "question_variants": [
+                    "كمية قليلة"
+                  ],
+                  "value": false
+                },
+                {
+                  "question": "Product",
+                  "question_variants": [
+                    "المنتج"
+                  ],
+                  "value": "Sunquick Orange"
+                }
+              ]
+            },
+            "summary": "Availability survey: Sunquick Orange available, stock not low"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192e01:0",
+            "action": "fill_form",
+            "status": "success",
+            "data": {
+              "form_name": "Availability Survey",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "placed": [
+                {
+                  "question": "Available",
+                  "value": true
+                },
+                {
+                  "question": "Low Qty",
+                  "value": false
+                },
+                {
+                  "question": "Product",
+                  "value": "Sunquick Orange 200 ml"
+                }
+              ],
+              "not_placed": []
+            }
+          }
+        },
+        {
+          "says": "عبّئ نموذج Shelf audit: العصير متوفر، والبلانوغرام مطبق",
+          "request": {
+            "action": "fill_form",
+            "params": {
+              "form_name": "Shelf audit",
+              "answers": [
+                {
+                  "question": "العصير متوفر",
+                  "question_variants": [
+                    "juice available"
+                  ],
+                  "value": true
+                },
+                {
+                  "question": "البلانوغرام",
+                  "question_variants": [
+                    "planogram"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            "summary": "تعبئة Shelf audit: العصير متوفر، البلانوغرام مطبق"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192e02:0",
+            "action": "fill_form",
+            "status": "success",
+            "data": {
+              "form_name": "Shelf audit",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "placed": [
+                {
+                  "question": "Juice available",
+                  "value": true
+                }
+              ],
+              "not_placed": [
+                {
+                  "question": "البلانوغرام",
+                  "code": "value_not_allowed"
+                }
+              ],
+              "questions": [
+                {
+                  "question": "Juice available",
+                  "type": "yes_no",
+                  "required": true
+                },
+                {
+                  "question": "Planogram compliance %",
+                  "type": "number"
+                },
+                {
+                  "question": "Shelf photo",
+                  "type": "media",
+                  "required": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "Fill the price survey, Pepsi is 0.35",
+          "request": {
+            "action": "fill_form",
+            "params": {
+              "form_name": "price survey",
+              "form_name_variants": [
+                "استبيان الأسعار"
+              ],
+              "answers": [
+                {
+                  "question": "Pepsi price",
+                  "question_variants": [
+                    "سعر بيبسي"
+                  ],
+                  "value": 0.35
+                }
+              ]
+            },
+            "summary": "Price survey: Pepsi 0.35"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708192e03:0",
+            "action": "fill_form",
+            "status": "failed",
+            "error": "No form matched \"price survey\".",
+            "data": {
+              "code": "form_not_found",
+              "forms": [
+                "Competitor prices",
+                "Shelf audit"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_cart",
+      "title": "Read the cart",
+      "summary": "Read the order, invoice or return being prepared in the app's cart, line by line — the phone answers at once, without asking the rep.",
+      "description": "Reads the document being prepared in the app's cart — a sales order, return sales order,\ninvoice or return invoice — with its client and every line. It only reads, so the phone answers\nat once: no card, nothing for the rep to confirm.\nUse it for \"what's in my cart?\", \"what did I order?\", and before edit_cart when the rep means\nlines you don't have (\"3 of each\") — the rep may have changed the cart by hand since the last\nbuild_order. To show the cart to the rep, use open_cart.",
+      "since": "0.5.0",
+      "reports_result": true,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "kind",
+          "client_id",
+          "client_name",
+          "lines"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "The document being prepared."
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The client it is for."
+          },
+          "lines": {
+            "type": "array",
+            "description": "Every line, in the order the cart lists them.",
+            "items": {
+              "type": "object",
+              "required": [
+                "product",
+                "qty"
+              ],
+              "properties": {
+                "product": {
+                  "type": "string",
+                  "description": "The product's name as saved."
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "cart_empty",
+          "description": "The cart is empty — nothing is being prepared."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong; error says what."
+        }
+      ],
+      "examples": [
+        {
+          "says": "What's in my cart?",
+          "request": {
+            "action": "get_cart",
+            "params": {},
+            "summary": "Read your cart"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193401:0",
+            "action": "get_cart",
+            "status": "success",
+            "data": {
+              "kind": "sales_order",
+              "client_id": "65f1a2b3c4d5e6f708192a01",
+              "client_name": "Al Noor Market",
+              "lines": [
+                {
+                  "product": "Sunquick Orange 200 ml",
+                  "qty": 5,
+                  "unit": "Piece"
+                },
+                {
+                  "product": "Pepsi 330 ml",
+                  "qty": 3,
+                  "unit": "Piece"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "says": "شو في السلة؟",
+          "request": {
+            "action": "get_cart",
+            "params": {},
+            "summary": "قراءة السلة"
+          },
+          "result": {
+            "ref": "65f1a2b3c4d5e6f708193402:0",
+            "action": "get_cart",
+            "status": "failed",
+            "error": "The cart is empty.",
+            "data": {
+              "code": "cart_empty"
             }
           }
         }
@@ -1505,7 +2604,7 @@ export const CATALOG: MobileActionsCatalog = {
       "name": "open_activity",
       "title": "Open a client activity",
       "summary": "Open one of the app's activities for a client — forms, retail execution, store check, audit, notes, photos, orders, invoices, collection, CLM, history, media — for the rep to complete.",
-      "description": "Opens an activity for a client so the rep completes it in the app; the phone handles the\nvisit, permissions and picking. Prefer it over open_screen for anything done for a client,\nand never tell the rep to go there themselves.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;\n  the client is matched as for start_visit, and the rep picks when several match.\n- A specific form or retail-execution template: put its name in form_name or template_name.\n- Visit: form, form_history, collection, reminders, clm, client_history, media and\n  ai_sales_order open without a visit; sales_order too when the rep may order outside a visit.\n  The rest need an open visit at the client — the card offers \"Start visit & continue\", and\n  any start_visit check can stop it.\n- prefill opens the screen already filled for the rep to review and submit — use it whenever\n  the rep tells you what to record in a form, a note or a reminder, so they never type it\n  again. form (with form_name): {\"<the question's key words as the rep said them> | <the same\n  words in English, or in Arabic if the rep wrote English>\": answer} — 1–4 words per side, not\n  a full sentence; form questions are often saved in another language than the rep speaks.\n  note: {\"content\": …}. reminders: {\"name\": …, \"content\": …, \"from\"?: …, \"to\"?: …} — opens a\n  new reminder instead of the list. Numbers as numbers, yes/no as true/false, dates as\n  YYYY-MM-DD, free text as text. Photos, signatures, scans and list picks stay with the rep.\n- An order, invoice or return WITH products is build_order, not this.\nThe phone reports nothing back — not when the activity opens, not when it fails (a failure\nonly shows on the card) — so tell the rep what they will see, not that it is done.",
+      "description": "Opens an activity for a client so the rep completes it in the app; the phone handles the\nvisit, permissions and picking. Prefer it over open_screen for anything done for a client,\nand never tell the rep to go there themselves.\n- Client: during an open visit, leave it out — the visit's client is used, and naming another\n  client fails. Otherwise send client_name (with client_name_variants), client_id or nearest;\n  the client is matched as for start_visit, and the rep picks when several match.\n- A specific form or retail-execution template: put its name in form_name or template_name.\n- Visit: form, form_history, collection, reminders, clm, client_history, media and\n  ai_sales_order open without a visit; sales_order too when the rep may order outside a visit.\n  The rest need an open visit at the client — the card offers \"Start visit & continue\", and\n  any start_visit check can stop it.\n- prefill opens the screen already filled for the rep to review and submit — use it whenever\n  the rep tells you what to record in a form, a note or a reminder, so they never type it\n  again. For a form, use fill_form instead when you have it: it reports what was placed.\n  form (with form_name): {\"<the question's key words as the rep said them> | <the same\n  words in English, or in Arabic if the rep wrote English>\": answer} — 1–4 words per side, not\n  a full sentence; form questions are often saved in another language than the rep speaks.\n  note: {\"content\": …}. reminders: {\"name\": …, \"content\": …, \"from\"?: …, \"to\"?: …} — opens a\n  new reminder instead of the list. Numbers as numbers, yes/no as true/false, dates as\n  YYYY-MM-DD, free text as text. Photos, signatures, scans and list picks stay with the rep.\n- An order, invoice or return WITH products is build_order, not this.\nThe phone reports nothing back — not when the activity opens, not when it fails (a failure\nonly shows on the card) — so tell the rep what they will see, not that it is done.",
       "since": "0.1.0",
       "reports_result": false,
       "params": {
@@ -1726,6 +2825,68 @@ export const CATALOG: MobileActionsCatalog = {
               }
             },
             "summary": "New reminder for Al Noor Market"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_cart",
+      "title": "Open the cart",
+      "summary": "Open the order, invoice or return being prepared in the app's cart, for the rep to review and submit.",
+      "description": "Opens the app's cart — the document being prepared: a sales order, return sales order, invoice\nor return invoice — so the rep can review, change and submit it. Use it for \"open my cart\",\n\"show me the order\", \"take me back to the invoice\". To say what's in it use get_cart; to change\nor remove lines, edit_cart; to add products, build_order. kind only when the rep names the document: the phone checks the cart\nholds it.\nThe phone reports nothing back — not when the cart opens, not when it fails (a failure only\nshows on the card) — so tell the rep what they will see, not that it is done.",
+      "since": "0.5.0",
+      "reports_result": false,
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sales_order",
+              "return_sales_order",
+              "invoice",
+              "return_invoice"
+            ],
+            "description": "Only when the rep names the document; the phone checks the cart holds it."
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "cart_empty",
+          "description": "The cart is empty — nothing is being prepared."
+        },
+        {
+          "code": "kind_mismatch",
+          "description": "The cart holds another document."
+        },
+        {
+          "code": "sales_screen_open",
+          "description": "A sales screen is already open in the app."
+        },
+        {
+          "code": "error",
+          "description": "Something else went wrong."
+        }
+      ],
+      "examples": [
+        {
+          "says": "Open my cart",
+          "request": {
+            "action": "open_cart",
+            "params": {},
+            "summary": "Open your cart"
+          }
+        },
+        {
+          "says": "رجعني على فاتورة الإرجاع",
+          "request": {
+            "action": "open_cart",
+            "params": {
+              "kind": "return_invoice"
+            },
+            "summary": "فتح فاتورة الإرجاع في السلة"
           }
         }
       ]

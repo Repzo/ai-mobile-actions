@@ -1,0 +1,225 @@
+# yaml-language-server: $schema=../schemas/action-definition.schema.json
+name: edit_cart
+title: Change the cart's lines
+summary: >-
+  Change quantities or units of lines in the order, invoice or return being prepared in the app's
+  cart, or remove lines — for the rep to review and submit.
+since: 0.5.0
+reports_result: true
+description: |-
+  Changes the document being prepared in the app's cart — a sales order, return sales order,
+  invoice or return invoice, whichever it holds — and opens the cart for the rep to review and
+  submit (it never submits anything itself). Use it when the rep changes lines already in the
+  cart: "make it 3", "change the Pepsi to cartons", "remove the coffee", "3 of each". To add
+  products use build_order; to empty the whole cart, clear_cart.
+  - lines: one entry per line to change, named as the rep said it or as the cart shows it, plus
+    product_variants. The phone matches them against the cart's lines only, never the whole
+    catalog; when several lines match (one product in two units or variants), the rep picks on
+    the card. For "each line" or "all of them", list every line — read them with get_cart when
+    you don't have them (the rep may have changed the cart by hand since the last build_order).
+  - qty is the line's new quantity, not a difference: "2 more" on a line of 3 is qty 5. unit only
+    when the rep names a new one, in English ("carton", "box", "piece"). remove: true takes the
+    line out.
+  - kind only when the rep names the document ("the return"): the phone checks the cart holds it.
+  The action succeeds when at least one line changed: the result lists the lines changed, removed
+  and failed — summarize them briefly. It fails as a whole when the cart is empty or no line could
+  be changed.
+
+params:
+  type: object
+  additionalProperties: false
+  required: [lines]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+      description: Only when the rep names the document; the phone checks the cart holds it.
+    lines:
+      type: array
+      minItems: 1
+      maxItems: 30
+      items:
+        type: object
+        additionalProperties: false
+        required: [product]
+        properties:
+          product:
+            type: string
+            minLength: 1
+            description: The line's product, as the rep said it or as the cart shows it.
+          product_variants: { $shared: product_variants }
+          variant:
+            type: string
+            minLength: 1
+            description: Only to tell apart two lines of one product — "330ml", "Diet".
+          qty:
+            type: number
+            exclusiveMinimum: 0
+            description: The line's new quantity — in unit when given, else in the line's unit.
+          unit:
+            type: string
+            minLength: 1
+            description: A new unit, only when the rep names one, in English — "carton", "box", "piece".
+          remove:
+            type: boolean
+            const: true
+            description: Take the line out of the cart.
+        # Each entry changes something; a removed line takes no new quantity or unit.
+        anyOf:
+          - required: [qty]
+          - required: [unit]
+          - required: [remove]
+        if: { required: [remove] }
+        then:
+          not:
+            anyOf:
+              - required: [qty]
+              - required: [unit]
+
+result:
+  type: object
+  required: [kind, client_id, client_name, changed, removed, failed, lines_left]
+  properties:
+    kind:
+      type: string
+      enum: [sales_order, return_sales_order, invoice, return_invoice]
+    client_id: { type: string, description: The client the document is for. }
+    client_name: { type: string }
+    changed:
+      type: array
+      description: The lines changed, as they are now.
+      items:
+        type: object
+        required: [product, qty]
+        properties:
+          product: { type: string, description: The product's name as saved. }
+          qty: { type: number }
+          unit: { type: string }
+          variant: { type: string }
+          previous_qty: { type: number, description: The line's quantity before the change. }
+          requested_qty:
+            type: number
+            description: >-
+              The quantity asked for, when the line took a different one — e.g. a van invoice,
+              capped at the stock left on the van.
+    removed:
+      type: array
+      description: The lines taken out.
+      items:
+        type: object
+        required: [product]
+        properties:
+          product: { type: string, description: The product's name as saved. }
+          qty: { type: number }
+          unit: { type: string }
+          variant: { type: string }
+    failed:
+      type: array
+      description: The entries that could not be applied.
+      items:
+        type: object
+        required: [product, code]
+        properties:
+          product: { type: string, description: The product as it was asked for. }
+          code:
+            type: string
+            description: >-
+              Why: line_not_found (no line in the cart matched), line_ambiguous (several matched
+              and none was picked), unit_not_found, unit_not_allowed, fractional_qty_not_allowed,
+              out_of_stock, or error.
+    lines_left:
+      type: integer
+      minimum: 0
+      description: How many lines the cart holds now.
+
+errors:
+  - code: cart_empty
+    description: The cart is empty — nothing is being prepared.
+  - code: kind_mismatch
+    description: The cart holds another document, data.kind.
+    data:
+      kind: { type: string, enum: [sales_order, return_sales_order, invoice, return_invoice] }
+  - code: not_available
+    description: Changing the cart is off for the rep (module or permission).
+  - code: no_changes
+    description: No line could be changed; data.failed says why, line by line.
+    data:
+      changed: { type: array, maxItems: 0 }
+      removed: { type: array, maxItems: 0 }
+      failed: { type: array, items: { type: object } }
+  - code: error
+    description: Something else went wrong; error says what.
+
+examples:
+  - says: Make the Pepsi 5 and remove the water
+    request:
+      action: edit_cart
+      params:
+        lines:
+          - { product: Pepsi, product_variants: [بيبسي], qty: 5 }
+          - { product: water, product_variants: [مياه, مي], remove: true }
+      summary: Pepsi to 5, remove the water
+    result:
+      ref: "65f1a2b3c4d5e6f708192d01:0"
+      action: edit_cart
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        changed:
+          - { product: Pepsi 330 ml, qty: 5, unit: Piece, previous_qty: 3 }
+        removed:
+          - { product: Mineral Water 500 ml, qty: 5, unit: Carton }
+        failed: []
+        lines_left: 2
+  - says: خلي الكميات ثلاث ثلاث من كل بند
+    request:
+      action: edit_cart
+      params:
+        lines:
+          - { product: Sunquick Orange 200 ml, qty: 3 }
+          - { product: Pepsi 330 ml, qty: 3 }
+      summary: كل بند في السلة ٣ حبات
+    result:
+      ref: "65f1a2b3c4d5e6f708192d02:0"
+      action: edit_cart
+      status: success
+      data:
+        kind: sales_order
+        client_id: 65f1a2b3c4d5e6f708192a01
+        client_name: Al Noor Market
+        changed:
+          - { product: Sunquick Orange 200 ml, qty: 3, unit: Piece, previous_qty: 5 }
+          - { product: Pepsi 330 ml, qty: 3, unit: Piece, previous_qty: 3 }
+        removed: []
+        failed: []
+        lines_left: 2
+  - says: Remove the juice from the return
+    request:
+      action: edit_cart
+      params:
+        kind: return_invoice
+        lines:
+          - { product: juice, product_variants: [عصير], remove: true }
+      summary: Remove the juice from the return
+    result:
+      ref: "65f1a2b3c4d5e6f708192d03:0"
+      action: edit_cart
+      status: failed
+      error: The cart holds a sales order, not a return invoice.
+      data:
+        code: kind_mismatch
+        kind: sales_order
+
+maintainer_notes:
+  - The app implements this from contract 0.5.0; until then the backend must not offer it.
+  - >-
+    Asked for in testing on 2026-11-04: the rep asked to make every line 3, to delete a line and
+    add it again, and to delete the whole cart — the assistant had no action for any of them.
+    It must work the same for every document the cart can hold (sales order, return sales order,
+    invoice, return invoice).
+  - >-
+    App team: add any failure the app can hit here that isn't listed (e.g. build_order's
+    sales_screen_open or order_in_progress), and say whether a price or discount change should be
+    an edit too (not offered yet).

@@ -117,6 +117,84 @@ test("actions newer than the app's contract version are never offered to it", ()
   }
 });
 
+test("the 0.5.0 actions are offered from 0.5.0 only", () => {
+  const added = ["get_cart", "edit_cart", "clear_cart", "open_cart", "fill_form"];
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  for (const name of added) {
+    assert.ok(!offered("0.4.0").includes(name), `${name} is not offered to 0.4.0 apps`);
+    assert.ok(offered("0.5.0").includes(name), `${name} is offered from 0.5.0`);
+    assert.equal(getAction(name, { version: "0.4.0" }), undefined);
+  }
+});
+
+test("edit_cart: every entry changes something, and a removed line takes no new quantity", () => {
+  const editCart = ajv.compile(getAction("edit_cart").params);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 3 }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", unit: "carton" }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 2, unit: "carton" }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: true }] }), true);
+  assert.equal(editCart({ lines: [{ product: "Pepsi" }] }), false, "an entry that changes nothing");
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: true, qty: 3 }] }), false);
+  assert.equal(editCart({ lines: [{ product: "Pepsi", remove: false }] }), false, "remove is only ever true");
+  assert.equal(editCart({ lines: [{ product: "Pepsi", qty: 0 }] }), false, "qty > 0 — remove takes a line out");
+  assert.equal(editCart({ lines: [] }), false, "at least one line");
+  assert.equal(editCart({ kind: "transfer", lines: [{ product: "Pepsi", qty: 1 }] }), false);
+});
+
+test("the cart actions cover every document the cart can hold", () => {
+  const kinds = getAction("build_order").params.properties.kind.enum;
+  for (const name of ["edit_cart", "clear_cart", "open_cart"]) {
+    assert.deepEqual(getAction(name).params.properties.kind.enum, kinds, name);
+  }
+  for (const name of ["get_cart", "edit_cart", "clear_cart"]) {
+    assert.deepEqual(getAction(name).result.properties.kind.enum, kinds, name);
+  }
+  const clearCart = ajv.compile(getAction("clear_cart").params);
+  assert.equal(clearCart({}), true);
+  assert.equal(clearCart({ kind: "return_invoice" }), true);
+});
+
+test("fill_form: a named form and at least one typed answer; the result says what was placed", () => {
+  const fillForm = ajv.compile(getAction("fill_form").params);
+  const answer = (value) => ({ form_name: "Availability survey", answers: [{ question: "Available", value }] });
+  for (const value of [true, 3, 0.35, "2026-01-15", "Sunquick Orange", ["A", "B"]]) {
+    assert.equal(fillForm(answer(value)), true, JSON.stringify(value));
+  }
+  assert.equal(fillForm(answer({ amount: 1 })), false, "answers are plain values");
+  assert.equal(fillForm(answer([])), false, "several picks means at least one");
+  assert.equal(fillForm({ form_name: "Availability survey", answers: [] }), false, "at least one answer");
+  assert.equal(fillForm({ answers: [{ question: "Available", value: true }] }), false, "the form is named");
+  assert.equal(fillForm({ form_name: "F", answers: [{ value: true }] }), false, "each answer names its question");
+
+  const action = getAction("fill_form");
+  assert.equal(action.reports_result, true);
+  const data = ajv.compile(action.result);
+  const base = { form_name: "F", client_id: "1", client_name: "A" };
+  assert.equal(data({ ...base, placed: [{ question: "Q", value: true }], not_placed: [] }), true);
+  assert.equal(data({ ...base, placed: [], not_placed: [{ question: "Q" }] }), false, "a not-placed answer says why");
+});
+
+test("every action the guidance names is one of the catalog's actions", () => {
+  const names = new Set(catalog.actions.map((action) => action.name));
+  for (const rule of catalog.guidance) {
+    for (const [word] of rule.matchAll(/\b[a-z]+(?:_[a-z]+)+\b/g)) {
+      assert.ok(names.has(word), `guidance names ${word}, which is not an action: ${rule}`);
+    }
+  }
+});
+
+test("get_cart only reads: no parameters, and a result for every document", () => {
+  const action = getAction("get_cart");
+  assert.equal(action.reports_result, true);
+  assert.equal(ajv.compile(action.params)({}), true);
+  assert.equal(ajv.compile(action.params)({ kind: "sales_order" }), false, "it reads whatever the cart holds");
+  const data = ajv.compile(action.result);
+  const base = { kind: "return_invoice", client_id: "1", client_name: "A" };
+  assert.equal(data({ ...base, lines: [{ product: "P", qty: 1, unit: "Piece" }] }), true);
+  assert.equal(data({ ...base, lines: [{ product: "P" }] }), false, "a line names its qty");
+  assert.deepEqual(action.errors.map((error) => error.code), ["cart_empty", "error"]);
+});
+
 test("the jobs actions arrive with 0.4.0 and take no parameters", () => {
   const offered = (version) => listActions({ version }).map((action) => action.name);
   for (const name of ["get_jobs", "open_jobs"]) {
