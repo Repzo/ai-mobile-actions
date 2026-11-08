@@ -204,6 +204,18 @@ test("the jobs actions arrive with 0.4.0 and take no parameters", () => {
   }
 });
 
+test("fill_retail_execution arrives with 0.6.0 and needs a template and answers", () => {
+  const offered = (version) => listActions({ version }).map((action) => action.name);
+  assert.ok(!offered("0.5.0").includes("fill_retail_execution"));
+  assert.ok(offered("0.6.0").includes("fill_retail_execution"));
+  const params = ajv.compile(getAction("fill_retail_execution").params);
+  const answers = [{ question: "Price", value: 12 }];
+  assert.equal(params({ template_name: "Shelf check", source: "Pepsi", answers }), true);
+  assert.equal(params({ template_name: "Shelf check", answers }), false, "an item is required");
+  assert.equal(params({ source: "Pepsi", answers }), false, "a template is required");
+  assert.equal(params({ template_name: "Shelf check", answers: [] }), false, "at least one answer");
+});
+
 test("the short list carries one line per action, filtered by the app's contract version", () => {
   const all = listActions();
   assert.equal(all.length, catalog.actions.length);

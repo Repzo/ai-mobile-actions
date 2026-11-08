@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-11-08
+
+- `fill_retail_execution` (`since: 0.6.0`): fill one item (usually a product) of a retail
+  execution template with the rep's answers and open it filled — the rep reviews, saves and
+  submits the template as usual. Reports the answers placed and not placed, with the template's
+  questions when one wasn't, like `fill_form`. Needs an open visit (the card offers "Start visit
+  & fill").
+- Guidance: "Pick the action" routes filling a retail execution template to it.
+
 ## 0.5.0 — unreleased
 
 From testing the app with the assistant on 2026-11-04. Five new actions, all `since: 0.5.0`.
